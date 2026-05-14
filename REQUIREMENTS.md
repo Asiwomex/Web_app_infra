@@ -234,14 +234,16 @@ This project creates real HTTPS websites at `dev.theboateng.me`, `stage.theboate
 
 ### How DNS works in this project
 
-After each `terraform apply`, Terraform outputs two values you copy into Namecheap's Advanced DNS panel:
+Each environment requires **two CNAME records** on Namecheap — both must be present for the site to work:
 
-| What to add | Namecheap record type | Host | Value |
-|---|---|---|---|
-| ACM certificate validation | CNAME | output tells you (e.g. `_abc123.dev`) | output tells you |
-| Subdomain → ALB | CNAME | `dev` / `stage` / `prod` | ALB DNS name from output |
+| # | Purpose | When to add | Namecheap Host | Namecheap Value |
+|---|---------|-------------|----------------|-----------------|
+| 1 | ACM certificate validation (proves domain ownership so HTTPS works) | **During** `terraform apply` while it is paused | long hash prefix, e.g. `_cd650159180f02d30a24759917d0a259.dev` | long hash value from AWS output |
+| 2 | Subdomain → Load Balancer (routes traffic to your servers) | **After** `terraform apply` completes | `dev` / `stage` / `prod` | ALB DNS name from Terraform output |
 
-Terraform pauses and waits (up to 45 minutes) at the ACM certificate step. Add the CNAME record on Namecheap and the certificate validates automatically — Terraform then continues.
+> **Both records must exist at the same time.** Record #1 can be left in Namecheap permanently — it is harmless and re-validates automatically if the certificate ever renews.
+
+Terraform pauses and waits (up to 45 minutes) at the ACM certificate step. Add CNAME record #1 on Namecheap and the certificate validates automatically — Terraform then continues. After apply finishes, add CNAME record #2 so the subdomain resolves to your load balancer.
 
 ### What you need to do
 
@@ -492,20 +494,23 @@ module.alb.aws_acm_certificate_validation.main: Still creating... [32m40s elapse
 Terraform has the state file locked so `terraform output` won't work while it's running. Instead, get the validation CNAME directly from AWS in a second terminal:
 
 ```powershell
-# Get all pending ACM certificates and their validation records
-aws acm list-certificates --region us-east-1 `
-  --query "CertificateSummaryList[*].CertificateArn" --output text | ForEach-Object {
-    aws acm describe-certificate --certificate-arn $_ --region us-east-1 `
-      --query "[Certificate.DomainName, Certificate.DomainValidationOptions[0].ResourceRecord]" `
-      --output json
+# PowerShell — get ACM validation CNAMEs for all pending certificates
+$arns = (aws acm list-certificates --region us-east-1 `
+  --query "CertificateSummaryList[*].CertificateArn" --output text) -split '\s+'
+foreach ($arn in $arns) {
+  aws acm describe-certificate --certificate-arn $arn --region us-east-1 `
+    --query "[Certificate.DomainName, Certificate.DomainValidationOptions[0].ResourceRecord]" `
+    --output json
 }
 ```
 
-Each result gives you a `Name` and `Value`. Log in to **Namecheap → Domain List → theboateng.me → Manage → Advanced DNS** and add a CNAME record for each environment:
+Each result gives you a domain name, a `Name`, and a `Value`. Log in to **Namecheap → Domain List → theboateng.me → Manage → Advanced DNS** and add a CNAME record for each environment:
 
-| Type | Host | Value |
-|------|------|-------|
-| CNAME | the `Name` from output (e.g. `_abc123.dev`) | the `Value` from output |
+| Type | Host | Value | TTL |
+|------|------|-------|-----|
+| CNAME | everything before `.theboateng.me.` in the `Name` field (e.g. `_cd650159180f02d30a24759917d0a259.dev`) | the `Value` field without the trailing dot | Automatic |
+
+> **Strip trailing dots** — Namecheap adds them automatically. If the `Name` ends in `.theboateng.me.`, remove that entire suffix and use only what comes before it.
 
 Terraform will detect the validation and continue automatically within ~5 minutes of adding the record.
 
@@ -517,9 +522,13 @@ acm_validation_cname  = { ... }
 db_secret_arn         = "arn:aws:secretsmanager:us-east-1:123456789012:secret:..."
 ```
 
-5. Add one more CNAME record on Namecheap: host `dev` → value from `alb_dns_name`
+**After apply completes**, add the second CNAME on Namecheap (this routes traffic to your servers):
 
-`dev.theboateng.me` now resolves to your load balancer.
+| Type | Host | Value | TTL |
+|------|------|-------|-----|
+| CNAME | `dev` | value of `alb_dns_name` output (e.g. `insight-edge-dev-alb-xxx.us-east-1.elb.amazonaws.com`) | Automatic |
+
+You now have **two CNAME records in Namecheap for dev**: the long ACM validation hash record, and the short `dev` → ALB record. Both must remain. Repeat for staging (`stage`) and prod (`prod`).
 
 **Also immediately after apply:**
 - Check your email and click **"Confirm subscription"** from AWS Notifications — without this, you receive no alerts.
@@ -581,14 +590,31 @@ You should get a shell prompt on the instance. Type `exit` to close. If it fails
 
 ### 3. Verify the ALB is Reachable
 
-Open `https://dev.theboateng.me` in a browser. You should see **"Welcome to Development Environment"**. You can also verify with curl:
+**First, confirm DNS is resolving** — open a new PowerShell terminal:
+
+```powershell
+nslookup dev.theboateng.me
+```
+
+Expected: you should see one or more IP addresses in the response. If you see `can't find server` or `NXDOMAIN`, the CNAME records have not propagated yet — wait 2–5 minutes and try again.
+
+Once DNS resolves, open `https://dev.theboateng.me` in a browser. You should see **"Welcome to Development Environment"**. You can also verify with curl:
 
 ```bash
 curl -I https://dev.theboateng.me        # should return HTTP/2 200
 curl https://dev.theboateng.me/health    # should return: OK
 ```
 
-An SSL handshake failure means the CNAME record hasn't propagated yet — wait a few minutes and retry (DNS propagation can take up to a few hours on Namecheap). A 502 "Bad Gateway" means the EC2 instances haven't passed health checks yet — wait for the ASG warm-up (about 5 minutes after `apply` completes).
+**If the site shows "This site can't be reached" or "DNS address could not be found":**
+1. Confirm both CNAME records (ACM validation hash + `dev` → ALB) are saved in Namecheap Advanced DNS
+2. Run `nslookup dev.theboateng.me` — if it resolves, it is a browser cache issue
+3. Try opening the URL in an **incognito / private window** — this bypasses the browser DNS cache
+4. If incognito works but the normal window doesn't, clear your browser's DNS cache: in Chrome go to `chrome://net-internals/#dns` → click **Clear host cache**
+
+**Other error meanings:**
+- **SSL handshake failure / ERR_SSL_PROTOCOL_ERROR** — ACM certificate not yet validated. Confirm the ACM validation CNAME is in Namecheap, wait 5 minutes, retry.
+- **502 Bad Gateway** — EC2 instances haven't passed health checks yet. Wait 5 minutes after `apply` completes, check EC2 → Target Groups in the console.
+- **503 Service Unavailable** — no healthy instances in the ASG. Check that the ASG has at least one instance running.
 
 ### 4. Retrieve Database Credentials
 
@@ -693,7 +719,8 @@ Cost is highest in the first month because of RDS initial setup. Numbers are for
 | `terraform destroy` fails on prod | Deletion protection on ALB and RDS | In the AWS Console, disable deletion protection on the RDS instance and ALB manually, then run `terraform destroy`. |
 | RDS replica creation hangs >20 minutes | RDS primary is running its first automated backup | This is normal. Wait up to 30 minutes total. |
 | `Cognito user pool domain is already taken` | Another account already registered your `project_name-env` prefix | Change `project_name` in `terraform.tfvars` to something more unique (e.g. add your initials or a number). |
-| `apply` completes but `https://dev.theboateng.me` times out | Namecheap CNAME not yet added, or DNS not propagated | Add a CNAME record on Namecheap: host `dev`, value = `alb_dns_name` output. DNS propagation can take up to a few hours. Test with `Resolve-DnsName dev.theboateng.me` — should return the ALB hostname. |
+| `apply` completes but `https://dev.theboateng.me` shows "This site can't be reached" / `DNS_PROBE_POSSIBLE` | Subdomain CNAME not yet added to Namecheap, or DNS not propagated | Two CNAMEs are required per environment. First: the ACM validation hash CNAME (added during apply). Second: the subdomain → ALB CNAME (added after apply). In Namecheap Advanced DNS add: Type=CNAME, Host=`dev`, Value=`alb_dns_name` output (no trailing dot). Then test with `nslookup dev.theboateng.me` — should return IP addresses. |
+| `nslookup` resolves correctly but browser still shows "can't be reached" | Browser DNS cache is stale from before the CNAME was added | Try an **incognito / private window** first — this bypasses the browser cache. If that works, clear the browser's DNS cache: in Chrome go to `chrome://net-internals/#dns` → **Clear host cache**. |
 
 ---
 

@@ -1,0 +1,16 @@
+# Shell scripts must always use LF — CRLF line endings break bash on Linux EC2
+*.sh text eol=lf
+
+# Terraform files — normalize to LF
+*.tf    text eol=lf
+*.tfvars text eol=lf
+*.hcl   text eol=lf
+
+# Binary files — no line-ending conversion
+*.docx  binary
+*.jpeg  binary
+*.jpg   binary
+*.png   binary
+
+# DrawIO diagrams — treat as text with LF
+*.drawio text eol=lf

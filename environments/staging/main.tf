@@ -74,7 +74,6 @@ module "alb" {
   alb_sg_id                  = module.security_groups.alb_sg_id
   app_port                   = var.app_port
   domain_name                = var.alb_domain_name
-  route53_zone_id            = var.route53_zone_id
   health_check_path          = var.health_check_path
   enable_deletion_protection = false
   access_logs_bucket         = module.s3.bucket_name
@@ -137,15 +136,6 @@ module "cognito" {
   callback_urls = var.cognito_callback_urls
   logout_urls   = var.cognito_logout_urls
   tags          = local.tags
-}
-
-module "route53" {
-  source = "../../modules/route53"
-
-  domain_name       = var.domain_name
-  alb_dns_subdomain = var.alb_domain_name
-  alb_dns_name      = module.alb.alb_dns_name
-  alb_zone_id       = module.alb.alb_zone_id
 }
 
 module "monitoring" {

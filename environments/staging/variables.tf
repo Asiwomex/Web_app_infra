@@ -13,10 +13,6 @@ variable "domain_name" {
   default = "theboateng.me"
 }
 
-variable "route53_zone_id" {
-  type = string
-}
-
 variable "vpc_cidr" {
   type    = string
   default = "10.0.4.0/22"

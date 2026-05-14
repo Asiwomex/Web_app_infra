@@ -5,8 +5,7 @@ aws_region   = "us-east-1"
 project_name = "insight-edge"
 domain_name  = "theboateng.me"
 
-route53_zone_id = "Z03874001XT5UX4ZUS33K"
-key_pair_name   = "infratest"
+key_pair_name = "infratest"
 
 # VPC
 vpc_cidr                = "10.0.0.0/22"

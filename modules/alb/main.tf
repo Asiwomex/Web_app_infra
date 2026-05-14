@@ -13,29 +13,14 @@ resource "aws_acm_certificate" "main" {
   }
 }
 
-resource "aws_route53_record" "cert_validation" {
-  for_each = {
-    for dvo in aws_acm_certificate.main.domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      record = dvo.resource_record_value
-      type   = dvo.resource_record_type
-    }
-  }
-
-  allow_overwrite = true
-  name            = each.value.name
-  records         = [each.value.record]
-  ttl             = 60
-  type            = each.value.type
-  zone_id         = var.route53_zone_id
-}
-
+# Terraform waits here until ACM confirms the cert is validated.
+# After apply outputs the acm_validation_cname, add it to Namecheap DNS —
+# Terraform will then proceed automatically once ACM sees the record.
 resource "aws_acm_certificate_validation" "main" {
-  certificate_arn         = aws_acm_certificate.main.arn
-  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+  certificate_arn = aws_acm_certificate.main.arn
 
   timeouts {
-    create = "10m"
+    create = "45m"
   }
 }
 
@@ -52,8 +37,6 @@ resource "aws_lb" "main" {
   idle_timeout               = 60
   enable_http2               = true
 
-  # Access logs to S3 — invaluable for security forensics, debugging 5xx, and
-  # answering "who hit what endpoint when" during incident response.
   access_logs {
     bucket  = var.access_logs_bucket
     prefix  = "alb-${var.environment}"
@@ -66,8 +49,6 @@ resource "aws_lb" "main" {
 }
 
 # ─── Target Group ─────────────────────────────────────────────────────────────
-# The ASG registers/deregisters instances with this target group automatically
-# based on health checks. No direct aws_lb_target_group_attachment needed.
 
 resource "aws_lb_target_group" "app" {
   name     = "${var.project_name}-${var.environment}-tg"

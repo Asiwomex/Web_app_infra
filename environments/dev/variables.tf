@@ -13,11 +13,6 @@ variable "domain_name" {
   default = "theboateng.me"
 }
 
-variable "route53_zone_id" {
-  description = "Route 53 zone ID from bootstrap outputs"
-  type        = string
-}
-
 # ─── VPC ──────────────────────────────────────────────────────────────────────
 
 variable "vpc_cidr" {

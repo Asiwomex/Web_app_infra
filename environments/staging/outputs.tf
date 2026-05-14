@@ -2,8 +2,14 @@ output "vpc_id" {
   value = module.vpc.vpc_id
 }
 
-output "alb_url" {
-  value = "https://${module.route53.alb_fqdn}"
+output "alb_dns_name" {
+  description = "Add a CNAME record on Namecheap: 'stage' -> this value"
+  value       = module.alb.alb_dns_name
+}
+
+output "acm_validation_cname" {
+  description = "Add this CNAME record on Namecheap to validate the HTTPS certificate"
+  value       = module.alb.acm_validation_cname
 }
 
 output "asg_name" {

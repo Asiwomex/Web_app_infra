@@ -19,7 +19,7 @@ If you are new to cloud infrastructure, these terms appear constantly. Bookmark 
 | **ALB** | Application Load Balancer — sits in front of your servers and distributes incoming web traffic |
 | **WAF** | Web Application Firewall — filters malicious web requests before they reach your servers |
 | **S3** | Simple Storage Service — cloud file storage (like Google Drive, but for servers) |
-| **Route 53** | AWS's DNS service — translates domain names (e.g. `app.example.com`) to server IP addresses |
+| **Route 53** | AWS's DNS service — not used for DNS records in this project; DNS is managed on Namecheap |
 | **Cognito** | AWS's user authentication service — handles sign-up, sign-in, and tokens |
 | **GuardDuty** | AWS's threat-detection service — monitors your account for suspicious activity |
 | **CloudTrail** | Audit log of every API call made in your AWS account |
@@ -27,7 +27,7 @@ If you are new to cloud infrastructure, these terms appear constantly. Bookmark 
 | **EIP** | Elastic IP — a fixed, public IP address you can attach to a server |
 | **NAT Gateway** | Lets servers in private subnets reach the internet without being publicly accessible themselves |
 | **ASG** | Auto Scaling Group — automatically adds or removes servers based on load |
-| **Hosted Zone** | A container in Route 53 that holds all the DNS records for one domain |
+| **CNAME Record** | A DNS record type that points one name to another name (e.g. `dev.theboateng.me` → ALB DNS name) — this is how subdomains are configured on Namecheap |
 | **Terraform State** | A file (stored in S3) that Terraform uses to remember what resources it already created |
 | **Backend** | Where Terraform stores its state file — in this project, an S3 bucket |
 
@@ -230,46 +230,41 @@ Find all region codes at [https://aws.amazon.com/about-aws/global-infrastructure
 
 ## Section 6 — Domain Name & DNS
 
-This project creates real HTTPS websites at `dev.theboateng.me`, `stage.theboateng.me`, and `prod.theboateng.me`. You need a real domain name you own.
+This project creates real HTTPS websites at `dev.theboateng.me`, `stage.theboateng.me`, and `prod.theboateng.me`. DNS is managed directly on **Namecheap** — no Route 53 hosted zone is used or required.
 
-### Option A — You already own a domain
+### How DNS works in this project
 
-Skip ahead to "What you need to do".
+After each `terraform apply`, Terraform outputs two values you copy into Namecheap's Advanced DNS panel:
 
-### Option B — Buy a domain through AWS Route 53
+| What to add | Namecheap record type | Host | Value |
+|---|---|---|---|
+| ACM certificate validation | CNAME | output tells you (e.g. `_abc123.dev`) | output tells you |
+| Subdomain → ALB | CNAME | `dev` / `stage` / `prod` | ALB DNS name from output |
 
-1. In the AWS Console, go to **Route 53** → **Registered domains** → **Register domain**.
-2. Search for your desired domain, add it to cart, and complete purchase (~$12/year for a `.com`).
-3. AWS automatically creates a hosted zone for it.
-
-### Option C — Buy a domain elsewhere (GoDaddy, Namecheap, Google Domains, etc.)
-
-Buy from wherever is cheapest. The domain itself does not need to be in AWS — you will just point its nameservers to AWS in a later step.
+Terraform pauses and waits (up to 45 minutes) at the ACM certificate step. Add the CNAME record on Namecheap and the certificate validates automatically — Terraform then continues.
 
 ### What you need to do
 
-The project is already configured for `theboateng.me` with subdomains `dev.theboateng.me`, `stage.theboateng.me`, and `prod.theboateng.me`. **No changes needed** — the domain is set and matches the Namecheap-registered domain.
+The project is already configured for `theboateng.me`. **No changes needed** — the domain is set and matches the Namecheap-registered domain.
 
 If you ever need to use a different domain, run:
 
 ```bash
 # macOS / Linux
 sed -i '' 's/theboateng\.me/yourdomain.example/g' \
-  bootstrap/variables.tf \
-  environments/*/variables.tf \
   environments/*/terraform.tfvars
 ```
 
 ```powershell
 # Windows PowerShell
-Get-ChildItem -Recurse -Include "*.tf","*.tfvars" | ForEach-Object {
+Get-ChildItem -Recurse -Include "*.tfvars" | ForEach-Object {
   (Get-Content $_.FullName) -replace 'theboateng\.me','yourdomain.example' | Set-Content $_.FullName
 }
 ```
 
-After running the command, open `environments/dev/terraform.tfvars` and verify the subdomain values look correct for your domain. They should now read `dev.yourdomain.example`, `stage.yourdomain.example`, `prod.yourdomain.example`.
+After running the command, verify the subdomain values in each `terraform.tfvars` read `dev.yourdomain.example`, `stage.yourdomain.example`, `prod.yourdomain.example`.
 
-> **You do not need to do anything at your registrar yet.** The Bootstrap step (Section 12) creates your Route 53 hosted zone, and only then do you update the nameservers at your registrar.
+> **You do not need to do anything at Namecheap before applying.** The DNS records are added after each `terraform apply` using the values from the outputs.
 
 ---
 
@@ -344,7 +339,7 @@ Gabriel_Infra/
 │   ├── rds/                PostgreSQL database (primary + replica)
 │   ├── s3/                 File storage + ALB access logs
 │   ├── cognito/            User authentication
-│   ├── route53/            DNS records
+│   ├── route53/            DNS module (retained but not called — DNS is on Namecheap)
 │   └── monitoring/         CloudWatch alarms + SNS alerts
 │
 └── environments/           One folder per environment. This is where you run
@@ -371,7 +366,6 @@ The following values are **already pre-filled** in all three `terraform.tfvars` 
 |-------|-------|--------|
 | `project_name` | `insight-edge` | Pre-configured |
 | `domain_name` | `theboateng.me` | Registered domain |
-| `route53_zone_id` | `Z03874001XT5UX4ZUS33K` | From Bootstrap output |
 | `key_pair_name` | `infratest` | EC2 key pair created in Section 7 |
 
 The only field you still need to fill in before deploying each environment is:
@@ -411,9 +405,9 @@ No changes needed here. Bootstrap must be applied before `terraform init` will w
 
 Bootstrap is a one-time setup that creates the infrastructure that Terraform itself needs:
 - An S3 bucket to store Terraform state files
-- A DynamoDB table for state locking (prevents two people applying at once)
-- A Route 53 hosted zone for your domain
 - Account-wide security: CloudTrail audit logging, GuardDuty threat detection, IAM password policy, default EBS encryption, and an AWS Budget alert
+
+> **Note:** Bootstrap does not create a Route 53 hosted zone. DNS is managed on Namecheap — see Section 6 and Section 15.
 
 ### Steps
 
@@ -450,53 +444,11 @@ Bootstrap takes 1–3 minutes. When finished, you will see output like:
 ```
 Outputs:
 
-aws_account_id          = "123456789012"
-route53_name_servers    = toset([
-  "ns-1234.awsdns-12.com",
-  "ns-456.awsdns-34.net",
-  "ns-789.awsdns-56.org",
-  "ns-012.awsdns-78.co.uk",
-])
-route53_zone_id         = "Z1234ABC5678DEF"
-state_bucket_name       = "my-project-terraform-state-123456789012"
+aws_account_id    = "123456789012"
+state_bucket_name = "insight-edge-terraform-state-123456789012"
 ```
 
-**Bootstrap is already complete for this project.** The outputs have been recorded — `route53_zone_id` and `key_pair_name` are pre-filled in all `terraform.tfvars` files. The nameservers for `theboateng.me` must still be pointed at Route 53 in Namecheap if not done already.
-
-For reference, the outputs look like this:
-
-### After Bootstrap — Update Nameservers at Your Registrar
-
-Your domain's DNS is now managed by AWS Route 53, but your domain registrar still points to the old nameservers. You need to update them.
-
-Log in to wherever you bought your domain and find the "Nameservers" or "DNS" settings. Replace whatever is there with the four `ns-xxx.awsdns-xx` values from the Bootstrap output above. The exact steps depend on your registrar:
-
-| Registrar | Where to find it |
-|-----------|-----------------|
-| GoDaddy | My Products → Manage → DNS → Nameservers → Change → Custom |
-| Namecheap | Domain List → Manage → Nameservers → Custom DNS |
-| Google Domains / Squarespace | DNS → Custom name servers |
-| Cloudflare | Websites → your domain → DNS → Nameservers |
-
-After saving, DNS propagation takes **15 minutes to 2 hours** (occasionally up to 48 hours). Verify propagation with:
-
-```bash
-# macOS / Linux
-dig NS yourdomain.example +short
-
-# Windows PowerShell
-Resolve-DnsName yourdomain.example -Type NS
-```
-
-The output should show the four `awsdns` nameservers. **Do not proceed to deploy environments until you see this.**
-
-> **Why this matters:** The HTTPS certificate validation in each environment uses DNS to verify you own the domain. If nameservers aren't pointing to Route 53 yet, `terraform apply` will hang for 10 minutes and then fail.
-
-### After Bootstrap — Fill In the Remaining Blanks
-
-Now you have the values you need to complete setup:
-
-All values are already pre-filled. The only remaining action is confirming Namecheap nameservers point to Route 53 (see "After Bootstrap — Update Nameservers" above).
+**Bootstrap is already complete for this project.** The state bucket exists and all `backend.tf` files are pre-configured. You can proceed directly to deploying the environments.
 
 ---
 
@@ -530,14 +482,35 @@ terraform apply
 
 Type `yes` when prompted. Watch the output. Terraform will print each resource as it's created. Near the end, RDS creation takes 10–15 minutes — this is normal.
 
-When finished, you'll see outputs like:
+**Important — Terraform will pause during apply** while waiting for the ACM certificate to validate. At that point, you must add records to Namecheap:
+
+When you see something like:
+```
+module.alb.aws_acm_certificate_validation.main: Still creating... [waiting for validation]
+```
+
+1. Open a second terminal in the same directory and run:
+   ```bash
+   terraform output acm_validation_cname
+   terraform output alb_dns_name
+   ```
+2. Log in to Namecheap → **Domain List** → `theboateng.me` → **Manage** → **Advanced DNS**
+3. Add the ACM validation CNAME record (name and value from `acm_validation_cname` output)
+4. Terraform will detect the validation and continue automatically
+
+When the full apply finishes, you'll see:
 
 ```
-alb_url    = "https://dev.theboateng.me"
-db_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:..."
+alb_dns_name          = "insight-edge-dev-alb-xxx.us-east-1.elb.amazonaws.com"
+acm_validation_cname  = { ... }
+db_secret_arn         = "arn:aws:secretsmanager:us-east-1:123456789012:secret:..."
 ```
 
-**Immediately after apply:**
+5. Add one more CNAME record on Namecheap: host `dev` → value from `alb_dns_name`
+
+`dev.theboateng.me` now resolves to your load balancer.
+
+**Also immediately after apply:**
 - Check your email and click **"Confirm subscription"** from AWS Notifications — without this, you receive no alerts.
 
 ### Deploy Staging
@@ -597,14 +570,14 @@ You should get a shell prompt on the instance. Type `exit` to close. If it fails
 
 ### 3. Verify the ALB is Reachable
 
-Open `https://dev.theboateng.me` in a browser. You should see a page that says **"This is the dev environment"**. You can also verify with curl:
+Open `https://dev.theboateng.me` in a browser. You should see **"Welcome to Development Environment"**. You can also verify with curl:
 
 ```bash
 curl -I https://dev.theboateng.me        # should return HTTP/2 200
 curl https://dev.theboateng.me/health    # should return: OK
 ```
 
-An SSL handshake failure means DNS hasn't propagated yet or the ACM certificate isn't validated — wait a few minutes and retry. A 502 "Bad Gateway" means the EC2 instances haven't passed health checks yet — wait for the ASG warm-up (about 5 minutes after `apply` completes).
+An SSL handshake failure means the CNAME record hasn't propagated yet — wait a few minutes and retry (DNS propagation can take up to a few hours on Namecheap). A 502 "Bad Gateway" means the EC2 instances haven't passed health checks yet — wait for the ASG warm-up (about 5 minutes after `apply` completes).
 
 ### 4. Retrieve Database Credentials
 
@@ -689,7 +662,7 @@ Cost is highest in the first month because of RDS initial setup. Numbers are for
 
 | What you see | Likely cause | Fix |
 |---|---|---|
-| `apply` hangs at ACM certificate validation for >5 min | Domain nameservers not yet pointing to Route 53 | Wait for DNS propagation. Run `Resolve-DnsName theboateng.me -Type NS` in PowerShell — should show AWS nameservers. Re-run `terraform apply` once propagation is confirmed. |
+| `apply` hangs at ACM certificate validation | ACM validation CNAME not yet added to Namecheap | Run `terraform output acm_validation_cname` in a second terminal and add the CNAME record on Namecheap (Domain List → Manage → Advanced DNS). Terraform will continue automatically once ACM detects it (usually within 5 minutes of adding the record). |
 | `Error: EIP quota exceeded` | Unexpected — this architecture uses only 4 EIPs total. Check that no other resources in the account are holding EIPs. Run `aws ec2 describe-addresses` to see all allocated EIPs. |
 | `Error: Failed to get existing workspaces: InvalidBucketName` | Bootstrap not run yet, or `backend.tf` still has `<ACCOUNT_ID>` placeholder | Run `cd bootstrap && terraform apply` first. The `backend.tf` files in this project already have the correct account ID pre-filled. |
 | `Error: Cycle: module.security_groups.aws_security_group.alb, module.security_groups.aws_security_group.app` | Security groups referencing each other in inline rules | Already fixed in this project — the cross-references use `aws_security_group_rule` resources instead of inline blocks. If this appears, check `modules/security_groups/main.tf`. |
@@ -709,7 +682,7 @@ Cost is highest in the first month because of RDS initial setup. Numbers are for
 | `terraform destroy` fails on prod | Deletion protection on ALB and RDS | In the AWS Console, disable deletion protection on the RDS instance and ALB manually, then run `terraform destroy`. |
 | RDS replica creation hangs >20 minutes | RDS primary is running its first automated backup | This is normal. Wait up to 30 minutes total. |
 | `Cognito user pool domain is already taken` | Another account already registered your `project_name-env` prefix | Change `project_name` in `terraform.tfvars` to something more unique (e.g. add your initials or a number). |
-| `apply` completes but `https://dev.theboateng.me` times out | DNS not propagated yet, or instances still initializing | Wait 5 minutes and retry. If the URL resolves but returns 502, the instances are up but nginx is still starting — wait another 5 minutes. |
+| `apply` completes but `https://dev.theboateng.me` times out | Namecheap CNAME not yet added, or DNS not propagated | Add a CNAME record on Namecheap: host `dev`, value = `alb_dns_name` output. DNS propagation can take up to a few hours. Test with `Resolve-DnsName dev.theboateng.me` — should return the ALB hostname. |
 
 ---
 
@@ -737,7 +710,7 @@ terraform destroy
 cd ../dev
 terraform destroy
 
-# 4. Bootstrap (last — destroys Route 53 zone, CloudTrail, GuardDuty, state bucket)
+# 4. Bootstrap (last — destroys CloudTrail, GuardDuty, state bucket)
 # WARNING: The state bucket has prevent_destroy=true. Remove that block from
 # bootstrap/main.tf before destroying:
 cd ../../bootstrap

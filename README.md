@@ -18,8 +18,7 @@ Every environment gets the following, fully automated:
 | **RDS PostgreSQL** | A managed database with one primary (read-write) and one replica (read-only) in different availability zones |
 | **S3 Bucket** | File storage and ALB access log storage |
 | **Cognito User Pool** | Handles user sign-up, sign-in, and authentication tokens for your application |
-| **Route 53 DNS Records** | Automatically creates `dev.theboateng.me`, `stage.theboateng.me`, `prod.theboateng.me` |
-| **ACM HTTPS Certificate** | Free TLS certificate, auto-validated via DNS |
+| **ACM HTTPS Certificate** | Free TLS certificate — certificate ARN and validation CNAME are output after apply so you can add them to Namecheap |
 | **CloudWatch Alarms** | 10 alarms covering CPU, memory, disk, unhealthy servers, replica lag, 5xx/4xx errors, and latency |
 | **SNS Email Alerts** | Delivers alarm notifications to your email inbox |
 | **Secrets Manager** | Stores database credentials securely — they never appear in config files or code |
@@ -42,7 +41,7 @@ At the account level (created once via Bootstrap):
                          Internet
                             │
                             ▼
-                        Route 53         (DNS: dev/stage/prod.theboateng.me → ALB)
+                    Namecheap DNS        (CNAME: dev/stage/prod.theboateng.me → ALB)
                             │
                             ▼
                     Internet Gateway     (entry point into the VPC)
@@ -71,7 +70,7 @@ At the account level (created once via Bootstrap):
 ```
 
 **How the traffic flows:**
-1. A user visits `https://prod.theboateng.me` (or `dev.theboateng.me`, `stage.theboateng.me`) → Route 53 resolves the name to the ALB's IP address
+1. A user visits `https://prod.theboateng.me` (or `dev.theboateng.me`, `stage.theboateng.me`) → Namecheap DNS resolves the CNAME to the ALB's DNS name
 2. The request passes through WAF (malicious requests are blocked here)
 3. The ALB terminates HTTPS, checks that a server is healthy, and forwards the request
 4. Your application server handles the request, queries the RDS database if needed, and responds
@@ -156,18 +155,16 @@ Deployment happens in four stages. Full step-by-step instructions are in REQUIRE
 
 ```
 Stage 1: Bootstrap (run once)
-  └─ Creates: state S3 bucket, DynamoDB lock table, Route 53 zone,
-              CloudTrail, GuardDuty, IAM policy, Budget
+  └─ Creates: state S3 bucket, CloudTrail, GuardDuty, IAM policy, Budget
 
-Stage 2: DNS setup (manual, ~15 min wait)
-  └─ Copy the 4 nameservers from Bootstrap output to your domain registrar
-
-Stage 3: Edit configuration files
-  └─ Replace placeholders in backend.tf and terraform.tfvars files
-
-Stage 4: Apply environments in order
+Stage 2: Apply environments in order
   └─ dev → staging → prod
-  └─ Verify each works before moving to the next
+
+Stage 3: DNS setup on Namecheap (manual, per environment)
+  └─ After each apply, copy two values from terraform output to Namecheap:
+     1. acm_validation_cname  → add to Namecheap so ACM can issue the HTTPS cert
+     2. alb_dns_name          → add as a CNAME record (e.g. "dev" → ALB DNS name)
+  └─ Terraform waits (up to 45 min) for ACM validation before continuing
 ```
 
 ### Quick-start commands (after completing REQUIREMENTS.md)
@@ -177,23 +174,21 @@ Stage 4: Apply environments in order
 cd bootstrap
 terraform init
 terraform apply -var='budget_alert_emails=["you@example.com"]'
-# → copy the outputs (route53_zone_id, state_bucket_name, name_servers)
 
-# Stage 2 — Update nameservers at your domain registrar (manual step, then wait)
-
-# Stage 3 — Edit files:
-#   environments/*/backend.tf   → replace <ACCOUNT_ID> with your 12-digit account ID
-#   environments/*/terraform.tfvars → fill in route53_zone_id, key_pair_name, alert_emails
-
-# Stage 4 — Apply environments
+# Stage 2 — Apply environments
 cd environments/dev
 terraform init && terraform plan && terraform apply
+# → terraform pauses at ACM validation — add the acm_validation_cname to Namecheap
+# → once cert validates, terraform completes and outputs alb_dns_name
+# → add a CNAME record on Namecheap: "dev" → alb_dns_name value
 
 cd ../staging
 terraform init && terraform plan && terraform apply
+# → same Namecheap steps: acm_validation_cname, then "stage" CNAME → alb_dns_name
 
 cd ../prod
 terraform init && terraform plan && terraform apply
+# → same Namecheap steps: acm_validation_cname, then "prod" CNAME → alb_dns_name
 ```
 
 ---
@@ -334,7 +329,7 @@ Three security groups with least-privilege rules:
 - **RDS SG**: accepts 5432 from app servers only; no outbound rule; DB admin access uses SSM port forwarding
 
 ### `modules/alb`
-Creates the load balancer, requests and validates an ACM HTTPS certificate, sets up an HTTP→HTTPS redirect, configures TLS 1.3 cipher policy, and enables access logging to S3.
+Creates the load balancer, requests an ACM HTTPS certificate (DNS validation), sets up an HTTP→HTTPS redirect, configures TLS 1.3 cipher policy, and enables access logging to S3. After apply, two outputs tell you exactly what to add to Namecheap: `acm_validation_cname` (for certificate validation) and `alb_dns_name` (the CNAME value for the subdomain).
 
 ### `modules/waf`
 Attaches a WAFv2 Web ACL to the ALB with five rules in priority order:
@@ -359,7 +354,7 @@ A single bucket serves two purposes: application file storage (under `backups/` 
 Creates a user pool (email sign-in, 12-character minimum password, SRP auth only, 1-hour token expiry, 30-day refresh tokens) and a Cognito domain at `{project_name}-{environment}.auth.{region}.amazoncognito.com`. Advanced security is enforced in prod.
 
 ### `modules/route53`
-Creates two DNS records in the shared hosted zone: an alias record pointing `alb_dns_subdomain` to the ALB, and an A record pointing `vpn_dns_subdomain` to the VPN's Elastic IP.
+Retained in the codebase but not called by any environment. DNS records are managed directly on Namecheap — see `modules/alb` outputs for the values to add.
 
 ### `modules/monitoring`
 Creates an SNS topic with email subscriptions, then 11 CloudWatch alarms:

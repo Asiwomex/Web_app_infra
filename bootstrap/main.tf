@@ -100,16 +100,6 @@ resource "aws_dynamodb_table" "terraform_locks" {
   }
 }
 
-# ─── Route 53 Hosted Zone ─────────────────────────────────────────────────────
-
-resource "aws_route53_zone" "main" {
-  name = var.domain_name
-
-  tags = {
-    Name = var.domain_name
-  }
-}
-
 # ─── Account-Wide Security Baselines ─────────────────────────────────────────
 
 # Strong password policy for any IAM users

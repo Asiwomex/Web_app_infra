@@ -8,16 +8,6 @@ output "dynamodb_table_name" {
   value       = aws_dynamodb_table.terraform_locks.name
 }
 
-output "route53_zone_id" {
-  description = "Route 53 hosted zone ID — set as route53_zone_id in each environment tfvars"
-  value       = aws_route53_zone.main.zone_id
-}
-
-output "route53_name_servers" {
-  description = "NS records to configure at your domain registrar"
-  value       = aws_route53_zone.main.name_servers
-}
-
 output "aws_account_id" {
   description = "AWS account ID — needed for backend bucket name"
   value       = data.aws_caller_identity.current.account_id

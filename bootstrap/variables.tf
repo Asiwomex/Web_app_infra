@@ -10,12 +10,6 @@ variable "project_name" {
   default     = "insight-edge"
 }
 
-variable "domain_name" {
-  description = "Root domain name for Route 53 hosted zone"
-  type        = string
-  default     = "theboateng.me"
-}
-
 variable "monthly_budget_usd" {
   description = "Account-wide monthly cost ceiling in USD. Triggers email at 80% actual and 100% forecast."
   type        = number

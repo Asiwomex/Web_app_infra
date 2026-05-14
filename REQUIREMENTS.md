@@ -486,17 +486,28 @@ Type `yes` when prompted. Watch the output. Terraform will print each resource a
 
 When you see something like:
 ```
-module.alb.aws_acm_certificate_validation.main: Still creating... [waiting for validation]
+module.alb.aws_acm_certificate_validation.main: Still creating... [32m40s elapsed]
 ```
 
-1. Open a second terminal in the same directory and run:
-   ```bash
-   terraform output acm_validation_cname
-   terraform output alb_dns_name
-   ```
-2. Log in to Namecheap → **Domain List** → `theboateng.me` → **Manage** → **Advanced DNS**
-3. Add the ACM validation CNAME record (name and value from `acm_validation_cname` output)
-4. Terraform will detect the validation and continue automatically
+Terraform has the state file locked so `terraform output` won't work while it's running. Instead, get the validation CNAME directly from AWS in a second terminal:
+
+```powershell
+# Get all pending ACM certificates and their validation records
+aws acm list-certificates --region us-east-1 `
+  --query "CertificateSummaryList[*].CertificateArn" --output text | ForEach-Object {
+    aws acm describe-certificate --certificate-arn $_ --region us-east-1 `
+      --query "[Certificate.DomainName, Certificate.DomainValidationOptions[0].ResourceRecord]" `
+      --output json
+}
+```
+
+Each result gives you a `Name` and `Value`. Log in to **Namecheap → Domain List → theboateng.me → Manage → Advanced DNS** and add a CNAME record for each environment:
+
+| Type | Host | Value |
+|------|------|-------|
+| CNAME | the `Name` from output (e.g. `_abc123.dev`) | the `Value` from output |
+
+Terraform will detect the validation and continue automatically within ~5 minutes of adding the record.
 
 When the full apply finishes, you'll see:
 
@@ -662,7 +673,7 @@ Cost is highest in the first month because of RDS initial setup. Numbers are for
 
 | What you see | Likely cause | Fix |
 |---|---|---|
-| `apply` hangs at ACM certificate validation | ACM validation CNAME not yet added to Namecheap | Run `terraform output acm_validation_cname` in a second terminal and add the CNAME record on Namecheap (Domain List → Manage → Advanced DNS). Terraform will continue automatically once ACM detects it (usually within 5 minutes of adding the record). |
+| `apply` hangs at ACM certificate validation (`Still creating... [30m+ elapsed]`) | ACM validation CNAME not yet added to Namecheap | Terraform locks the state during apply so `terraform output` won't work. Instead run: `aws acm list-certificates --region us-east-1 --query "CertificateSummaryList[*].CertificateArn" --output text \| ForEach-Object { aws acm describe-certificate --certificate-arn $_ --region us-east-1 --query "[Certificate.DomainName, Certificate.DomainValidationOptions[0].ResourceRecord]" --output json }` — copy the `Name` and `Value` into Namecheap Advanced DNS as a CNAME record. Terraform continues automatically within ~5 minutes. |
 | `Error: EIP quota exceeded` | Unexpected — this architecture uses only 4 EIPs total. Check that no other resources in the account are holding EIPs. Run `aws ec2 describe-addresses` to see all allocated EIPs. |
 | `Error: Failed to get existing workspaces: InvalidBucketName` | Bootstrap not run yet, or `backend.tf` still has `<ACCOUNT_ID>` placeholder | Run `cd bootstrap && terraform apply` first. The `backend.tf` files in this project already have the correct account ID pre-filled. |
 | `Error: Cycle: module.security_groups.aws_security_group.alb, module.security_groups.aws_security_group.app` | Security groups referencing each other in inline rules | Already fixed in this project — the cross-references use `aws_security_group_rule` resources instead of inline blocks. If this appears, check `modules/security_groups/main.tf`. |

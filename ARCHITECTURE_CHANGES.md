@@ -24,8 +24,8 @@ It also lists corrections that must be applied to `AWS_Infra_GRA.drawio`.
 | AZ2 Public Subnet | Not shown (only AZ1 had public subnet) | Public subnet in both AZ1 and AZ2 (ALB is multi-AZ) | ❌ NOT added |
 | S3 Buckets | One bucket shown: "Terraform state & backups" | Two buckets: (1) State bucket (bootstrap), (2) App data + ALB logs (per env) | ❌ Label not updated |
 | Environment names | Dev / Demo / Prod | Dev / Stage / Prod | ❌ "Demo" still in CIDR blocks and Resource Tags |
-| VPN DNS footnote | insight-edge-demo.com domain | theboateng.me domain (updated) — but VPN is fully removed | ❌ VPN DNS footnote still present, must be removed |
-| ALB DNS footnote | insight-edge-demo.com | dev/stage/prod.theboateng.me | ✅ Already updated |
+| VPN DNS footnote | insight-edge-demo.com domain | insight-edgecs.com domain (updated) — but VPN is fully removed | ❌ VPN DNS footnote still present, must be removed |
+| ALB DNS footnote | insight-edge-demo.com | dev/stage/prod.insight-edgecs.com | ✅ Already updated |
 
 ---
 
@@ -158,7 +158,7 @@ It also lists corrections that must be applied to `AWS_Infra_GRA.drawio`.
 **Why:** Same reason as above. All Terraform resources in the staging environment are tagged `Environment = "staging"`.
 
 ### Fix 3: Remove VPN Server DNS from footnotes
-**Current text:** VPN Server DNS section with vpn-dev.theboateng.me, vpn-stage.theboateng.me, vpn.theboateng.me
+**Current text:** VPN Server DNS section with vpn-dev.insight-edgecs.com, vpn-stage.insight-edgecs.com, vpn.insight-edgecs.com
 **Action:** Delete this entire footnote section.
 **Why:** The VPN module exists in the code but is completely unused. Admin access is exclusively via AWS SSM Session Manager. There is no VPN server running. Showing VPN DNS entries is misleading — no VPN records are created in Route 53.
 
@@ -185,7 +185,7 @@ The original diagram has no representation of account-wide services. These shoul
 | AWS Budgets | Cost alerts |
 | S3 State Bucket | Terraform remote state |
 | DynamoDB Lock Table | Terraform state locking |
-| Route 53 Hosted Zone | DNS for theboateng.me |
+| Route 53 Hosted Zone | DNS for insight-edgecs.com |
 | IAM Password Policy | Account security policy |
 
 ---
@@ -220,9 +220,9 @@ The Legend box needs these new entries added:
 - Prod: Environment: Production
 
 ### ALB DNS (already correct):
-- Dev: dev.theboateng.me
-- Stage: stage.theboateng.me
-- Prod: prod.theboateng.me
+- Dev: dev.insight-edgecs.com
+- Stage: stage.insight-edgecs.com
+- Prod: prod.insight-edgecs.com
 
 ### Admin Access (replace VPN Server DNS section):
 - All environments: AWS SSM Session Manager (no open ports, no VPN, no key pairs required)

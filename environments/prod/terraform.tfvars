@@ -3,7 +3,7 @@
 
 aws_region   = "us-east-1"
 project_name = "insight-edge"
-domain_name  = "theboateng.me"
+domain_name  = "insight-edgecs.com"
 
 key_pair_name = "infratest"
 
@@ -30,15 +30,15 @@ db_allocated_storage      = 50
 db_max_allocated_storage  = 500
 
 # ALB
-alb_domain_name   = "prod.theboateng.me"
+alb_domain_name   = "prod.insight-edgecs.com"
 health_check_path = "/health"
 
 # WAF — tighter rate limit for prod
 waf_rate_limit = 1000
 
 # Cognito
-cognito_callback_urls = ["https://prod.theboateng.me/callback"]
-cognito_logout_urls   = ["https://prod.theboateng.me/logout"]
+cognito_callback_urls = ["https://prod.insight-edgecs.com/callback"]
+cognito_logout_urls   = ["https://prod.insight-edgecs.com/logout"]
 
 # Alerting — REQUIRED for prod. Add at least one on-call email/distribution list.
 alert_emails = ["gabelorm@insight-edgecs.com"]

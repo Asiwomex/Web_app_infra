@@ -4,7 +4,7 @@ variable "domain_name" {
 }
 
 variable "alb_dns_subdomain" {
-  description = "Full subdomain for ALB (e.g. dev.theboateng.me)"
+  description = "Full subdomain for ALB (e.g. dev.insight-edgecs.com)"
   type        = string
 }
 

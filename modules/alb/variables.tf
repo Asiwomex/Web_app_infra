@@ -25,7 +25,7 @@ variable "app_port" {
 }
 
 variable "domain_name" {
-  description = "FQDN for the ALB (e.g. dev.theboateng.me)"
+  description = "FQDN for the ALB (e.g. dev.insight-edgecs.com)"
   type        = string
 }
 

@@ -27,7 +27,7 @@ If you are new to cloud infrastructure, these terms appear constantly. Bookmark 
 | **EIP** | Elastic IP — a fixed, public IP address you can attach to a server |
 | **NAT Gateway** | Lets servers in private subnets reach the internet without being publicly accessible themselves |
 | **ASG** | Auto Scaling Group — automatically adds or removes servers based on load |
-| **CNAME Record** | A DNS record type that points one name to another name (e.g. `dev.theboateng.me` → ALB DNS name) — this is how subdomains are configured on Namecheap |
+| **CNAME Record** | A DNS record type that points one name to another name (e.g. `dev.insight-edgecs.com` → ALB DNS name) — this is how subdomains are configured on Namecheap |
 | **Terraform State** | A file (stored in S3) that Terraform uses to remember what resources it already created |
 | **Backend** | Where Terraform stores its state file — in this project, an S3 bucket |
 
@@ -230,7 +230,7 @@ Find all region codes at [https://aws.amazon.com/about-aws/global-infrastructure
 
 ## Section 6 — Domain Name & DNS
 
-This project creates real HTTPS websites at `dev.theboateng.me`, `stage.theboateng.me`, and `prod.theboateng.me`. DNS is managed directly on **Namecheap** — no Route 53 hosted zone is used or required.
+This project creates real HTTPS websites at `dev.insight-edgecs.com`, `stage.insight-edgecs.com`, and `prod.insight-edgecs.com`. DNS is managed directly on **Namecheap** — no Route 53 hosted zone is used or required.
 
 ### How DNS works in this project
 
@@ -247,7 +247,7 @@ Terraform pauses and waits (up to 45 minutes) at the ACM certificate step. Add C
 
 ### What you need to do
 
-The project is already configured for `theboateng.me`. **No changes needed** — the domain is set and matches the Namecheap-registered domain.
+The project is already configured for `insight-edgecs.com`. **No changes needed** — the domain is set and matches the Namecheap-registered domain.
 
 If you ever need to use a different domain, run:
 
@@ -367,7 +367,7 @@ The following values are **already pre-filled** in all three `terraform.tfvars` 
 | Field | Value | Source |
 |-------|-------|--------|
 | `project_name` | `insight-edge` | Pre-configured |
-| `domain_name` | `theboateng.me` | Registered domain |
+| `domain_name` | `insight-edgecs.com` | Registered domain |
 | `key_pair_name` | `infratest` | EC2 key pair created in Section 7 |
 
 The only field you still need to fill in before deploying each environment is:
@@ -504,13 +504,13 @@ foreach ($arn in $arns) {
 }
 ```
 
-Each result gives you a domain name, a `Name`, and a `Value`. Log in to **Namecheap → Domain List → theboateng.me → Manage → Advanced DNS** and add a CNAME record for each environment:
+Each result gives you a domain name, a `Name`, and a `Value`. Log in to **Namecheap → Domain List → insight-edgecs.com → Manage → Advanced DNS** and add a CNAME record for each environment:
 
 | Type | Host | Value | TTL |
 |------|------|-------|-----|
-| CNAME | everything before `.theboateng.me.` in the `Name` field (e.g. `_cd650159180f02d30a24759917d0a259.dev`) | the `Value` field without the trailing dot | Automatic |
+| CNAME | everything before `.insight-edgecs.com.` in the `Name` field (e.g. `_cd650159180f02d30a24759917d0a259.dev`) | the `Value` field without the trailing dot | Automatic |
 
-> **Strip trailing dots** — Namecheap adds them automatically. If the `Name` ends in `.theboateng.me.`, remove that entire suffix and use only what comes before it.
+> **Strip trailing dots** — Namecheap adds them automatically. If the `Name` ends in `.insight-edgecs.com.`, remove that entire suffix and use only what comes before it.
 
 Terraform will detect the validation and continue automatically within ~5 minutes of adding the record.
 
@@ -593,21 +593,21 @@ You should get a shell prompt on the instance. Type `exit` to close. If it fails
 **First, confirm DNS is resolving** — open a new PowerShell terminal:
 
 ```powershell
-nslookup dev.theboateng.me
+nslookup dev.insight-edgecs.com
 ```
 
 Expected: you should see one or more IP addresses in the response. If you see `can't find server` or `NXDOMAIN`, the CNAME records have not propagated yet — wait 2–5 minutes and try again.
 
-Once DNS resolves, open `https://dev.theboateng.me` in a browser. You should see **"Welcome to Development Environment"**. You can also verify with curl:
+Once DNS resolves, open `https://dev.insight-edgecs.com` in a browser. You should see **"Welcome to Development Environment"**. You can also verify with curl:
 
 ```bash
-curl -I https://dev.theboateng.me        # should return HTTP/2 200
-curl https://dev.theboateng.me/health    # should return: OK
+curl -I https://dev.insight-edgecs.com        # should return HTTP/2 200
+curl https://dev.insight-edgecs.com/health    # should return: OK
 ```
 
 **If the site shows "This site can't be reached" or "DNS address could not be found":**
 1. Confirm both CNAME records (ACM validation hash + `dev` → ALB) are saved in Namecheap Advanced DNS
-2. Run `nslookup dev.theboateng.me` — if it resolves, it is a browser cache issue
+2. Run `nslookup dev.insight-edgecs.com` — if it resolves, it is a browser cache issue
 3. Try opening the URL in an **incognito / private window** — this bypasses the browser DNS cache
 4. If incognito works but the normal window doesn't, clear your browser's DNS cache: in Chrome go to `chrome://net-internals/#dns` → click **Clear host cache**
 
@@ -699,7 +699,7 @@ Cost is highest in the first month because of RDS initial setup. Numbers are for
 
 | What you see | Likely cause | Fix |
 |---|---|---|
-| `apply` hangs at ACM certificate validation (`Still creating... [30m+ elapsed]`) | ACM validation CNAME not yet added to Namecheap | Terraform locks the state during apply so `terraform output` won't work. Open a second terminal and run: `$arns = (aws acm list-certificates --region us-east-1 --query "CertificateSummaryList[*].CertificateArn" --output text) -split '\s+'; foreach ($arn in $arns) { aws acm describe-certificate --certificate-arn $arn --region us-east-1 --query "[Certificate.DomainName, Certificate.DomainValidationOptions[0].ResourceRecord]" --output json }` — copy the `Name` (strip trailing dot and `.theboateng.me` suffix) and `Value` (strip trailing dot) into Namecheap Advanced DNS as a CNAME. Terraform continues automatically within ~5 minutes. |
+| `apply` hangs at ACM certificate validation (`Still creating... [30m+ elapsed]`) | ACM validation CNAME not yet added to Namecheap | Terraform locks the state during apply so `terraform output` won't work. Open a second terminal and run: `$arns = (aws acm list-certificates --region us-east-1 --query "CertificateSummaryList[*].CertificateArn" --output text) -split '\s+'; foreach ($arn in $arns) { aws acm describe-certificate --certificate-arn $arn --region us-east-1 --query "[Certificate.DomainName, Certificate.DomainValidationOptions[0].ResourceRecord]" --output json }` — copy the `Name` (strip trailing dot and `.insight-edgecs.com` suffix) and `Value` (strip trailing dot) into Namecheap Advanced DNS as a CNAME. Terraform continues automatically within ~5 minutes. |
 | `Error: EIP quota exceeded` | Unexpected — this architecture uses only 4 EIPs total. Check that no other resources in the account are holding EIPs. Run `aws ec2 describe-addresses` to see all allocated EIPs. |
 | `Error: Failed to get existing workspaces: InvalidBucketName` | Bootstrap not run yet, or `backend.tf` still has `<ACCOUNT_ID>` placeholder | Run `cd bootstrap && terraform apply` first. The `backend.tf` files in this project already have the correct account ID pre-filled. |
 | `Error: Cycle: module.security_groups.aws_security_group.alb, module.security_groups.aws_security_group.app` | Security groups referencing each other in inline rules | Already fixed in this project — the cross-references use `aws_security_group_rule` resources instead of inline blocks. If this appears, check `modules/security_groups/main.tf`. |
@@ -719,7 +719,7 @@ Cost is highest in the first month because of RDS initial setup. Numbers are for
 | `terraform destroy` fails on prod | Deletion protection on ALB and RDS | In the AWS Console, disable deletion protection on the RDS instance and ALB manually, then run `terraform destroy`. |
 | RDS replica creation hangs >20 minutes | RDS primary is running its first automated backup | This is normal. Wait up to 30 minutes total. |
 | `Cognito user pool domain is already taken` | Another account already registered your `project_name-env` prefix | Change `project_name` in `terraform.tfvars` to something more unique (e.g. add your initials or a number). |
-| `apply` completes but `https://dev.theboateng.me` shows "This site can't be reached" / `DNS_PROBE_POSSIBLE` | Subdomain CNAME not yet added to Namecheap, or DNS not propagated | Two CNAMEs are required per environment. First: the ACM validation hash CNAME (added during apply). Second: the subdomain → ALB CNAME (added after apply). In Namecheap Advanced DNS add: Type=CNAME, Host=`dev`, Value=`alb_dns_name` output (no trailing dot). Then test with `nslookup dev.theboateng.me` — should return IP addresses. |
+| `apply` completes but `https://dev.insight-edgecs.com` shows "This site can't be reached" / `DNS_PROBE_POSSIBLE` | Subdomain CNAME not yet added to Namecheap, or DNS not propagated | Two CNAMEs are required per environment. First: the ACM validation hash CNAME (added during apply). Second: the subdomain → ALB CNAME (added after apply). In Namecheap Advanced DNS add: Type=CNAME, Host=`dev`, Value=`alb_dns_name` output (no trailing dot). Then test with `nslookup dev.insight-edgecs.com` — should return IP addresses. |
 | `nslookup` returns `No internal type for both IPv4 and IPv6 Addresses (A+AAAA) records available` | CNAME record is missing or was not saved correctly in Namecheap | The record did not persist — this happens if you edited a row in Namecheap but navigated away without clicking the **green checkmark** on that specific row. Go to Namecheap Advanced DNS, delete the record if it exists, re-add it, and click the green checkmark on the row to confirm before leaving the page. Then wait 1–2 minutes and run `nslookup` again. |
 | `nslookup` resolves correctly but browser still shows "can't be reached" | Browser DNS cache is stale from before the CNAME was added | Try an **incognito / private window** first — this bypasses the browser cache. If that works, clear the browser's DNS cache: in Chrome go to `chrome://net-internals/#dns` → **Clear host cache**. |
 

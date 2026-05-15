@@ -48,7 +48,7 @@ Everything else (security groups, encryption, IMDSv2, etc.) is identical across 
 After apply, useful values:
 
 ```bash
-terraform output alb_url               # https://dev.theboateng.me
+terraform output alb_url               # https://dev.insight-edgecs.com
 terraform output asg_name              # use with: aws ssm start-session --target <instance-id>
 terraform output db_secret_arn         # for fetching DB creds from Secrets Manager
 terraform output cognito_user_pool_id

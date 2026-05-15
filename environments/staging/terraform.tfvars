@@ -2,7 +2,7 @@
 
 aws_region   = "us-east-1"
 project_name = "insight-edge"
-domain_name  = "theboateng.me"
+domain_name  = "insight-edgecs.com"
 
 key_pair_name = "infratest"
 
@@ -29,15 +29,15 @@ db_allocated_storage      = 20
 db_max_allocated_storage  = 100
 
 # ALB
-alb_domain_name   = "stage.theboateng.me"
+alb_domain_name   = "stage.insight-edgecs.com"
 health_check_path = "/health"
 
 # WAF
 waf_rate_limit = 2000
 
 # Cognito
-cognito_callback_urls = ["https://stage.theboateng.me/callback"]
-cognito_logout_urls   = ["https://stage.theboateng.me/logout"]
+cognito_callback_urls = ["https://stage.insight-edgecs.com/callback"]
+cognito_logout_urls   = ["https://stage.insight-edgecs.com/logout"]
 
 # Alerting
 alert_emails = ["gabelorm@insight-edgecs.com"]

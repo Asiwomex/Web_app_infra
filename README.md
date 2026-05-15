@@ -41,7 +41,7 @@ At the account level (created once via Bootstrap):
                          Internet
                             │
                             ▼
-                    Namecheap DNS        (CNAME: dev/stage/prod.theboateng.me → ALB)
+                    Namecheap DNS        (CNAME: dev/stage/prod.insight-edgecs.com → ALB)
                             │
                             ▼
                     Internet Gateway     (entry point into the VPC)
@@ -70,7 +70,7 @@ At the account level (created once via Bootstrap):
 ```
 
 **How the traffic flows:**
-1. A user visits `https://prod.theboateng.me` (or `dev.theboateng.me`, `stage.theboateng.me`) → Namecheap DNS resolves the CNAME to the ALB's DNS name
+1. A user visits `https://prod.insight-edgecs.com` (or `dev.insight-edgecs.com`, `stage.insight-edgecs.com`) → Namecheap DNS resolves the CNAME to the ALB's DNS name
 2. The request passes through WAF (malicious requests are blocked here)
 3. The ALB terminates HTTPS, checks that a server is healthy, and forwards the request
 4. Your application server handles the request, queries the RDS database if needed, and responds
@@ -82,7 +82,7 @@ At the account level (created once via Bootstrap):
 
 | | Dev | Staging | Prod |
 |-|-----|---------|------|
-| URL | `dev.theboateng.me` | `stage.theboateng.me` | `prod.theboateng.me` |
+| URL | `dev.insight-edgecs.com` | `stage.insight-edgecs.com` | `prod.insight-edgecs.com` |
 | VPC CIDR | 10.0.0.0/22 | 10.0.4.0/22 | 10.0.8.0/22 |
 | App server | t3.small | t3.medium | t3.large |
 | ASG (min/desired/max) | 1 / 1 / 2 | 2 / 2 / 4 | 2 / 2 / 6 |

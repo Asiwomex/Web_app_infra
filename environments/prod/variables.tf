@@ -10,7 +10,7 @@ variable "project_name" {
 
 variable "domain_name" {
   type    = string
-  default = "theboateng.me"
+  default = "insight-edgecs.com"
 }
 
 variable "vpc_cidr" {
@@ -110,7 +110,7 @@ variable "db_max_allocated_storage" {
 
 variable "alb_domain_name" {
   type    = string
-  default = "prod.theboateng.me"
+  default = "prod.insight-edgecs.com"
 }
 
 variable "health_check_path" {
@@ -126,10 +126,10 @@ variable "waf_rate_limit" {
 
 variable "cognito_callback_urls" {
   type    = list(string)
-  default = ["https://prod.theboateng.me/callback"]
+  default = ["https://prod.insight-edgecs.com/callback"]
 }
 
 variable "cognito_logout_urls" {
   type    = list(string)
-  default = ["https://prod.theboateng.me/logout"]
+  default = ["https://prod.insight-edgecs.com/logout"]
 }

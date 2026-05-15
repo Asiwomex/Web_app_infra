@@ -25,7 +25,7 @@ terraform output aws_account_id
 
 ## After running
 
-1. At your domain registrar, replace the NS records for your domain (pre-configured as `theboateng.me` — update to your actual domain first per REQUIREMENTS.md Section 6) with the four name servers from `route53_name_servers`. Allow up to 48 hours to propagate (usually <1h).
+1. At your domain registrar, replace the NS records for your domain (pre-configured as `insight-edgecs.com` — update to your actual domain first per REQUIREMENTS.md Section 6) with the four name servers from `route53_name_servers`. Allow up to 48 hours to propagate (usually <1h).
 2. ~~In each `../environments/*/backend.tf`, replace `<ACCOUNT_ID>` with the account ID.~~ Already done — account ID `310688446551` is pre-filled in all backend files.
 3. In each `../environments/*/terraform.tfvars`, paste in `route53_zone_id`.
 

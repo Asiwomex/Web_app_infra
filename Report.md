@@ -1,7 +1,7 @@
 # Gabriel_Infra — Deployment Report
 
 **Project:** Gabriel_Infra  
-**Domain:** theboateng.me (Namecheap)  
+**Domain:** insight-edgecs.com (Namecheap)  
 **Cloud:** AWS — us-east-1  
 **AWS Account ID:** 310688446551  
 
@@ -33,7 +33,7 @@ A complete AWS infrastructure-as-code project using Terraform. It provisions thr
 | **Cognito** | User authentication. Email sign-in, OAuth2/PKCE client, configurable callback URLs per environment. |
 | **CloudWatch** | Monitors the stack with 11 alarms across EC2 (CPU/memory/disk), ALB (latency/5xx/unhealthy hosts), and RDS (CPU/storage/connections/replica lag). |
 | **SNS** | CloudWatch alarms and GuardDuty findings publish here. Engineers subscribe their email to receive alerts. |
-| **Route 53** | DNS management for theboateng.me. Bootstrap creates the hosted zone. Per-env ALB records are created automatically by Terraform. |
+| **Route 53** | DNS management for insight-edgecs.com. Bootstrap creates the hosted zone. Per-env ALB records are created automatically by Terraform. |
 | **CloudTrail** | Account-wide audit log. Records every AWS API call — who, what, when, from where. Bootstrap-level. |
 | **GuardDuty** | Threat detection. Monitors network traffic, S3 data events, EBS volumes, and EC2 runtime for malicious activity. Bootstrap-level. |
 | **AWS Budgets** | Sends email alerts at 80% and 100% of a monthly cost ceiling. Bootstrap-level. |
@@ -66,7 +66,7 @@ After apply, note the output values:
 
 ### Step 2 — Namecheap DNS
 
-1. Log in to Namecheap → Domain List → theboateng.me → Manage
+1. Log in to Namecheap → Domain List → insight-edgecs.com → Manage
 2. Under **Nameservers**, select **Custom DNS**
 3. Paste the 4 nameservers from the Bootstrap `name_servers` output
 4. Wait 15–60 minutes for propagation
@@ -91,7 +91,7 @@ Each environment has one file to edit before deploying:
 # Already set — verify these match your account
 aws_region      = "us-east-1"
 project_name    = "insight-edge"
-domain_name     = "theboateng.me"
+domain_name     = "insight-edgecs.com"
 
 # Paste from Bootstrap output
 route53_zone_id = "Z03874001XT5UX4ZUS33K"   # ← already filled
@@ -139,9 +139,9 @@ After each `apply`, AWS sends a confirmation email to every address in `alert_em
 | AWS Account ID | Your AWS account | `310688446551` |
 | Route 53 Zone ID | Bootstrap output | `Z03874001XT5UX4ZUS33K` |
 | State bucket | Bootstrap creates it | `insight-edge-terraform-state-310688446551` |
-| Dev URL | Auto-created by ALB module | `https://dev.theboateng.me` |
-| Staging URL | Auto-created by ALB module | `https://stage.theboateng.me` |
-| Prod URL | Auto-created by ALB module | `https://prod.theboateng.me` |
+| Dev URL | Auto-created by ALB module | `https://dev.insight-edgecs.com` |
+| Staging URL | Auto-created by ALB module | `https://stage.insight-edgecs.com` |
+| Prod URL | Auto-created by ALB module | `https://prod.insight-edgecs.com` |
 | DB credentials | Auto-generated, stored in Secrets Manager | Retrieved at runtime — never hardcoded |
 
 ---

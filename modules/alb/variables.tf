@@ -29,6 +29,22 @@ variable "domain_name" {
   type        = string
 }
 
+variable "subject_alternative_names" {
+  description = "Additional domains to include in the ACM certificate (SANs). Used in the nonprod shared environment."
+  type        = list(string)
+  default     = []
+}
+
+variable "extra_routes" {
+  description = "Additional host-based routing rules. Each entry creates a target group and HTTPS listener rule."
+  type = list(object({
+    name        = string
+    host_header = string
+    port        = number
+  }))
+  default = []
+}
+
 variable "health_check_path" {
   type    = string
   default = "/health"

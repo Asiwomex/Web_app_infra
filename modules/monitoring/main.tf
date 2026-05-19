@@ -59,6 +59,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_storage_low" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "rds_replica_lag" {
+  count               = var.rds_replica_id != "" ? 1 : 0
   alarm_name          = "${var.project_name}-${var.environment}-rds-replica-lag"
   alarm_description   = "Read replica more than 60 seconds behind primary"
   comparison_operator = "GreaterThanThreshold"
@@ -75,7 +76,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_replica_lag" {
     DBInstanceIdentifier = var.rds_replica_id
   }
 
-  tags = var.tags
+  tags = merge(var.tags, {})
 }
 
 # ─── ALB Alarms ──────────────────────────────────────────────────────────────

@@ -17,27 +17,27 @@ variable "domain_name" {
 
 variable "vpc_cidr" {
   type    = string
-  default = "10.0.0.0/22"
+  default = "10.0.12.0/22"
 }
 
 variable "public_subnet_az1_cidr" {
   type    = string
-  default = "10.0.0.0/25"
+  default = "10.0.12.0/25"
 }
 
 variable "public_subnet_az2_cidr" {
   type    = string
-  default = "10.0.0.128/25"
+  default = "10.0.12.128/25"
 }
 
 variable "private_subnet_az1_cidr" {
   type    = string
-  default = "10.0.1.0/24"
+  default = "10.0.13.0/24"
 }
 
 variable "private_subnet_az2_cidr" {
   type    = string
-  default = "10.0.2.0/24"
+  default = "10.0.14.0/24"
 }
 
 # ─── EC2 ──────────────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ variable "app_instance_type" {
 
 variable "app_root_volume_size" {
   type    = number
-  default = 30
+  default = 20
 }
 
 variable "app_port" {
@@ -77,13 +77,7 @@ variable "asg_desired_capacity" {
   default = 1
 }
 
-variable "alert_emails" {
-  description = "Email addresses for CloudWatch alarm notifications"
-  type        = list(string)
-  default     = []
-}
-
-# ─── RDS ──────────────────────────────────────────────────────────────────────
+# ─── RDS (shared between dev and staging sub-environments) ────────────────────
 
 variable "db_name" {
   type    = string
@@ -100,23 +94,6 @@ variable "db_instance_class" {
   default = "db.t3.micro"
 }
 
-variable "db_replica_instance_class" {
-  type    = string
-  default = "db.t3.micro"
-}
-
-variable "create_replica" {
-  description = "Whether to create an RDS read replica"
-  type        = bool
-  default     = false
-}
-
-variable "enable_waf" {
-  description = "Whether to deploy WAF in front of the ALB"
-  type        = bool
-  default     = false
-}
-
 variable "db_allocated_storage" {
   type    = number
   default = 20
@@ -129,31 +106,15 @@ variable "db_max_allocated_storage" {
 
 # ─── ALB ──────────────────────────────────────────────────────────────────────
 
-variable "alb_domain_name" {
-  type    = string
-  default = "dev.insight-edgecs.com"
-}
-
 variable "health_check_path" {
   type    = string
   default = "/health"
 }
 
-# ─── WAF ──────────────────────────────────────────────────────────────────────
+# ─── Alerting ─────────────────────────────────────────────────────────────────
 
-variable "waf_rate_limit" {
-  type    = number
-  default = 2000
-}
-
-# ─── Cognito ──────────────────────────────────────────────────────────────────
-
-variable "cognito_callback_urls" {
-  type    = list(string)
-  default = ["https://dev.insight-edgecs.com/callback"]
-}
-
-variable "cognito_logout_urls" {
-  type    = list(string)
-  default = ["https://dev.insight-edgecs.com/logout"]
+variable "alert_emails" {
+  description = "Email addresses for CloudWatch alarm notifications"
+  type        = list(string)
+  default     = []
 }

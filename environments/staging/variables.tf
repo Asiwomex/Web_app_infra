@@ -59,17 +59,17 @@ variable "app_port" {
 
 variable "asg_min_size" {
   type    = number
-  default = 2
+  default = 1
 }
 
 variable "asg_max_size" {
   type    = number
-  default = 4
+  default = 2
 }
 
 variable "asg_desired_capacity" {
   type    = number
-  default = 2
+  default = 1
 }
 
 variable "alert_emails" {
@@ -90,12 +90,24 @@ variable "db_username" {
 
 variable "db_instance_class" {
   type    = string
-  default = "db.t3.small"
+  default = "db.t3.micro"
 }
 
 variable "db_replica_instance_class" {
   type    = string
-  default = "db.t3.small"
+  default = "db.t3.micro"
+}
+
+variable "create_replica" {
+  description = "Whether to create an RDS read replica"
+  type        = bool
+  default     = false
+}
+
+variable "enable_waf" {
+  description = "Whether to deploy WAF in front of the ALB"
+  type        = bool
+  default     = false
 }
 
 variable "db_allocated_storage" {

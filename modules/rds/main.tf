@@ -36,7 +36,7 @@ resource "aws_secretsmanager_secret_version" "db" {
     host     = aws_db_instance.primary.address
     port     = 5432
     dbname   = var.db_name
-    ro_host  = aws_db_instance.replica.address
+    ro_host  = var.create_replica ? aws_db_instance.replica[0].address : aws_db_instance.primary.address
   })
 }
 
@@ -139,6 +139,7 @@ resource "aws_db_instance" "primary" {
 # ─── Read Replica (AZ2) ───────────────────────────────────────────────────────
 
 resource "aws_db_instance" "replica" {
+  count      = var.create_replica ? 1 : 0
   identifier = "${var.project_name}-${var.environment}-replica"
 
   # Replica inherits engine, version, db_name, username, password from source

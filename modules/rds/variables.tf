@@ -35,6 +35,12 @@ variable "replica_instance_class" {
   default     = "db.t3.micro"
 }
 
+variable "create_replica" {
+  description = "Whether to create a read replica. Set false for non-prod to save cost."
+  type        = bool
+  default     = true
+}
+
 variable "allocated_storage" {
   description = "Initial allocated storage in GB"
   type        = number

@@ -18,8 +18,9 @@ variable "rds_primary_id" {
 }
 
 variable "rds_replica_id" {
-  description = "RDS read replica instance identifier"
+  description = "RDS read replica instance identifier. Pass empty string when no replica exists."
   type        = string
+  default     = ""
 }
 
 variable "alb_arn_suffix" {

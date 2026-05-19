@@ -113,10 +113,14 @@ module "rds" {
   max_allocated_storage  = var.db_max_allocated_storage
   primary_az             = "${var.aws_region}a"
   replica_az             = "${var.aws_region}b"
+  create_replica         = var.create_replica
   tags                   = local.tags
 }
 
+# ─── WAF (disabled for staging to save cost) ─────────────────────────────────
+
 module "waf" {
+  count  = var.enable_waf ? 1 : 0
   source = "../../modules/waf"
 
   project_name       = var.project_name

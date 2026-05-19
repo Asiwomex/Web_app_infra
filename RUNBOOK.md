@@ -222,9 +222,80 @@ Then open `https://prod.insight-edgecs.com` — expect **"Welcome to Production 
 
 ---
 
+---
+
+## Option: Deploy Nonprod Instead of Separate Dev + Staging
+
+The `environments/nonprod` environment runs dev and staging on shared infrastructure (one VPC, one NAT Gateway, one ALB, one RDS). Use this instead of Steps 1 and 2 to save ~$2.76 per 24 hours.
+
+> **Do not** run `environments/dev` or `environments/staging` at the same time as `environments/nonprod` — they share resource names in the same AWS account.
+
+### Nonprod Step A — Pre-apply imports
+
+```powershell
+cd environments/nonprod
+terraform init
+
+# Import CloudWatch log group if it persisted from a previous run
+terraform import module.vpc.aws_cloudwatch_log_group.vpc_flow /aws/vpc/insight-edge-nonprod/flow-logs
+
+# Import Secrets Manager secret (after restoring it above)
+terraform import module.rds.aws_secretsmanager_secret.db insight-edge/nonprod/db-credentials
+```
+
+> If either returns `Cannot import non-existent remote object`, skip it.
+
+### Nonprod Step B — Apply
+
+```powershell
+terraform apply
+```
+
+### Nonprod Step C — Add ACM Validation CNAMEs to Cloudflare (during apply)
+
+The nonprod cert covers **both** `dev.insight-edgecs.com` and `stage.insight-edgecs.com`. When you see `aws_acm_certificate_validation.main: Still creating...`, run:
+
+```powershell
+$arns = (aws acm list-certificates --region us-east-1 --query "CertificateSummaryList[*].CertificateArn" --output text) -split '\s+'
+foreach ($arn in $arns) {
+  aws acm describe-certificate --certificate-arn $arn --region us-east-1 `
+    --query "[Certificate.DomainName, Certificate.DomainValidationOptions[*].ResourceRecord]" `
+    --output json
+}
+```
+
+Find the block for `dev.insight-edgecs.com` (which also covers `stage`). Add **two** CNAME records to Cloudflare:
+
+| Type | Name | Target | Proxy |
+|------|------|--------|-------|
+| CNAME | `_<hash>.dev` | validation value (no trailing dot) | DNS only |
+| CNAME | `_<hash>.stage` | validation value (no trailing dot) | DNS only |
+
+### Nonprod Step D — Add both subdomain CNAMEs after apply
+
+Both subdomains point to the **same** ALB (use the `alb_dns_name` output):
+
+| Type | Name | Target | Proxy |
+|------|------|--------|-------|
+| CNAME | `dev` | `alb_dns_name` output value | DNS only |
+| CNAME | `stage` | `alb_dns_name` output value | DNS only |
+
+### Nonprod Step E — Verify
+
+```powershell
+nslookup dev.insight-edgecs.com
+nslookup stage.insight-edgecs.com
+```
+
+Both should resolve. Then open `https://dev.insight-edgecs.com` and `https://stage.insight-edgecs.com`.
+
+---
+
 ## Step 4 — Cloudflare DNS Summary
 
-By the end you should have **6 CNAME records** in Cloudflare (all grey cloud, DNS only):
+**If using separate dev + staging (Steps 1–3):** you should have **6 CNAME records** in Cloudflare (all grey cloud, DNS only):
+
+**If using nonprod instead (Option above + Step 3):** you should have **5 CNAME records** — 2 ACM validation (dev+stage from same cert), 2 subdomain CNAMEs (dev+stage → same ALB), 1 prod ACM, 1 prod subdomain.
 
 | Type | Name | Purpose |
 |------|------|---------|

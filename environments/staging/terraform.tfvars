@@ -13,20 +13,24 @@ public_subnet_az2_cidr  = "10.0.4.128/25"
 private_subnet_az1_cidr = "10.0.5.0/24"
 private_subnet_az2_cidr = "10.0.6.0/24"
 
-# Compute  (HA: 2 instances across AZ1+AZ2; scales to 4 on load)
-app_instance_type    = "t3.medium"
-app_root_volume_size = 30
+# Compute
+app_instance_type    = "t3.micro"
+app_root_volume_size = 20
 app_port             = 8080
-asg_min_size         = 2
-asg_max_size         = 4
-asg_desired_capacity = 2
+asg_min_size         = 1
+asg_max_size         = 2
+asg_desired_capacity = 1
 # Database
 db_name                   = "appdb"
 db_username               = "dbadmin"
-db_instance_class         = "db.t3.small"
-db_replica_instance_class = "db.t3.small"
+db_instance_class         = "db.t3.micro"
+db_replica_instance_class = "db.t3.micro"
 db_allocated_storage      = 20
-db_max_allocated_storage  = 100
+db_max_allocated_storage  = 50
+create_replica            = false
+
+# WAF — disabled for staging to save cost
+enable_waf = false
 
 # ALB
 alb_domain_name   = "stage.insight-edgecs.com"

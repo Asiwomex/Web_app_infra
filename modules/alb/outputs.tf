@@ -33,6 +33,16 @@ output "https_listener_arn" {
   value = aws_lb_listener.https.arn
 }
 
+output "extra_target_group_arns" {
+  description = "Map of extra route name to target group ARN — pass to additional ASG modules"
+  value       = { for k, tg in aws_lb_target_group.extra : k => tg.arn }
+}
+
+output "extra_target_group_arn_suffixes" {
+  description = "Map of extra route name to target group ARN suffix — used for CloudWatch dimensions"
+  value       = { for k, tg in aws_lb_target_group.extra : k => tg.arn_suffix }
+}
+
 output "acm_validation_cname" {
   description = "Add these CNAME records to Namecheap DNS to validate the ACM certificate"
   value = {

@@ -7,11 +7,11 @@ output "primary_address" {
 }
 
 output "replica_endpoint" {
-  value = aws_db_instance.replica.endpoint
+  value = var.create_replica ? aws_db_instance.replica[0].endpoint : ""
 }
 
 output "replica_address" {
-  value = aws_db_instance.replica.address
+  value = var.create_replica ? aws_db_instance.replica[0].address : ""
 }
 
 output "db_secret_arn" {
@@ -31,5 +31,5 @@ output "primary_identifier" {
 }
 
 output "replica_identifier" {
-  value = aws_db_instance.replica.identifier
+  value = var.create_replica ? aws_db_instance.replica[0].identifier : ""
 }

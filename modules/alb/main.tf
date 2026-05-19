@@ -1,8 +1,9 @@
 # ─── ACM Certificate ──────────────────────────────────────────────────────────
 
 resource "aws_acm_certificate" "main" {
-  domain_name       = var.domain_name
-  validation_method = "DNS"
+  domain_name               = var.domain_name
+  subject_alternative_names = var.subject_alternative_names
+  validation_method         = "DNS"
 
   tags = merge(var.tags, {
     Name = "${var.project_name}-${var.environment}-cert"
@@ -111,4 +112,56 @@ resource "aws_lb_listener" "https" {
   tags = merge(var.tags, {
     Name = "${var.project_name}-${var.environment}-https-listener"
   })
+}
+
+# ─── Extra host-based routes (used by nonprod shared environment) ─────────────
+
+locals {
+  extra_routes_map = { for idx, r in var.extra_routes : r.name => merge(r, { priority = 10 + idx }) }
+}
+
+resource "aws_lb_target_group" "extra" {
+  for_each = local.extra_routes_map
+
+  name     = "${var.project_name}-${each.key}-tg"
+  port     = each.value.port
+  protocol = "HTTP"
+  vpc_id   = var.vpc_id
+
+  deregistration_delay = 30
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    interval            = 30
+    path                = var.health_check_path
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    timeout             = 5
+    matcher             = "200-299"
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.project_name}-${each.key}-tg"
+  })
+}
+
+resource "aws_lb_listener_rule" "extra" {
+  for_each     = local.extra_routes_map
+  listener_arn = aws_lb_listener.https.arn
+  priority     = each.value.priority
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.extra[each.key].arn
+  }
+
+  condition {
+    host_header {
+      values = [each.value.host_header]
+    }
+  }
+
+  tags = var.tags
 }

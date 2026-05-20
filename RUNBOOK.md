@@ -1,7 +1,11 @@
 # Deployment Runbook — Full Redeploy from Scratch
 
-Use this after a `terraform destroy` to bring all three environments back up.
+Use this after a `terraform destroy` to bring all environments back up.
 Domain: `insight-edgecs.com` | AWS Account: `310688446551` | Region: `us-east-1`
+
+**Environments:**
+- `environments/nonprod` — dev + staging on shared infrastructure (one VPC, one ALB, one RDS)
+- `environments/prod` — production, fully isolated
 
 ---
 
@@ -16,40 +20,39 @@ Domain: `insight-edgecs.com` | AWS Account: `310688446551` | Region: `us-east-1`
 
 ## Before You Start — Clean Up Leftover AWS Resources
 
-After `terraform destroy`, two types of resources persist in AWS and will cause errors if not handled before applying:
+After `terraform destroy`, two types of resources persist and will cause errors on re-apply:
 
 1. **CloudWatch Log Groups** — not deleted by Terraform destroy; must be imported into new state
 2. **Secrets Manager Secrets** — go into a 7-day scheduled deletion queue; must be restored before Terraform can recreate them
 
-Also, **ACM validation CNAME hashes change on every new deployment** — delete the old `_<hash>.dev`, `_<hash>.stage`, `_<hash>.prod` records from Cloudflare before applying. You will add new ones during the apply.
+Also, **ACM validation CNAME hashes change on every new deployment** — delete the old `_<hash>.dev`, `_<hash>.stage`, `_<hash>.prod` records from Cloudflare before applying.
 
 ### Restore Secrets Manager secrets (run once before any apply)
 
 ```powershell
-aws secretsmanager restore-secret --secret-id insight-edge/dev/db-credentials --region us-east-1
-aws secretsmanager restore-secret --secret-id insight-edge/staging/db-credentials --region us-east-1
+aws secretsmanager restore-secret --secret-id insight-edge/nonprod/db-credentials --region us-east-1
 aws secretsmanager restore-secret --secret-id insight-edge/prod/db-credentials --region us-east-1
 ```
 
-> If any command returns `ResourceNotFoundException`, the secret was fully deleted (past the 7-day window) — skip that one, Terraform will create it fresh.
+> If any command returns `ResourceNotFoundException`, the secret was fully deleted (past the 7-day window) — skip it, Terraform will create it fresh.
 
 ---
 
-## Step 1 — Deploy Dev
+## Step 1 — Deploy Nonprod (dev + staging on shared infra)
 
 ### Step 1a — Pre-apply imports
 
 Run these before `terraform apply` to prevent known errors:
 
 ```powershell
-cd environments/dev
+cd environments/nonprod
 terraform init
 
 # Import CloudWatch log group if it still exists from previous deployment
-terraform import module.vpc.aws_cloudwatch_log_group.vpc_flow /aws/vpc/insight-edge-dev/flow-logs
+terraform import module.vpc.aws_cloudwatch_log_group.vpc_flow /aws/vpc/insight-edge-nonprod/flow-logs
 
 # Import Secrets Manager secret (after restoring it above)
-terraform import module.rds.aws_secretsmanager_secret.db insight-edge/dev/db-credentials
+terraform import module.rds.aws_secretsmanager_secret.db insight-edge/nonprod/db-credentials
 ```
 
 > If either import returns `Cannot import non-existent remote object`, skip it — Terraform will create it fresh.
@@ -60,8 +63,9 @@ terraform import module.rds.aws_secretsmanager_secret.db insight-edge/dev/db-cre
 terraform apply
 ```
 
-### Step 1c — Add ACM Validation CNAME to Cloudflare (during apply)
+### Step 1c — Add ACM Validation CNAMEs to Cloudflare (during apply)
 
+The nonprod cert covers **both** `dev.insight-edgecs.com` and `stage.insight-edgecs.com`.
 When you see:
 ```
 module.alb.aws_acm_certificate_validation.main: Still creating... [Xm elapsed]
@@ -73,12 +77,12 @@ Open a **second terminal** and run:
 $arns = (aws acm list-certificates --region us-east-1 --query "CertificateSummaryList[*].CertificateArn" --output text) -split '\s+'
 foreach ($arn in $arns) {
   aws acm describe-certificate --certificate-arn $arn --region us-east-1 `
-    --query "[Certificate.DomainName, Certificate.DomainValidationOptions[0].ResourceRecord]" `
+    --query "[Certificate.DomainName, Certificate.DomainValidationOptions[*].ResourceRecord]" `
     --output json
 }
 ```
 
-Find the block for `dev.insight-edgecs.com`. In Cloudflare → `insight-edgecs.com` → DNS → Records → Add record:
+Find the block for `dev.insight-edgecs.com`. It will have **two** validation entries (one for `dev`, one for `stage`). In Cloudflare → `insight-edgecs.com` → DNS → Add **two** records:
 
 | Field | Value |
 |-------|-------|
@@ -88,88 +92,36 @@ Find the block for `dev.insight-edgecs.com`. In Cloudflare → `insight-edgecs.c
 | Proxy status | **DNS only (grey cloud)** |
 | TTL | Auto |
 
-Click the **green checkmark** on the row to save. Terraform detects validation within ~5 minutes and continues automatically.
+Repeat for the `stage` entry (`_abc123.stage`). Terraform detects validation within ~5 minutes and continues automatically.
 
-### Step 1d — Add subdomain CNAME after apply completes
+### Step 1d — Add subdomain CNAMEs after apply completes
 
-Copy `alb_dns_name` from the Terraform output. In Cloudflare add:
+Both subdomains point to the **same** ALB. Copy `alb_dns_name` from Terraform output and add two records in Cloudflare:
 
-| Field | Value |
-|-------|-------|
-| Type | `CNAME` |
-| Name | `dev` |
-| Target | `alb_dns_name` output value (e.g. `insight-edge-dev-alb-xxx.us-east-1.elb.amazonaws.com`) |
-| Proxy status | **DNS only (grey cloud)** |
-| TTL | Auto |
+| Field | dev record | staging record |
+|-------|-----------|----------------|
+| Type | `CNAME` | `CNAME` |
+| Name | `dev` | `stage` |
+| Target | `alb_dns_name` output value | same `alb_dns_name` output value |
+| Proxy status | **DNS only (grey cloud)** | **DNS only (grey cloud)** |
+| TTL | Auto | Auto |
 
-### Step 1e — Verify dev
+### Step 1e — Verify nonprod
 
 ```powershell
 nslookup dev.insight-edgecs.com
-```
-
-Should return IP addresses. Then open `https://dev.insight-edgecs.com` — expect **"Welcome to Development Environment"** with a padlock.
-
----
-
-## Step 2 — Deploy Staging
-
-### Step 2a — Pre-apply imports
-
-```powershell
-cd environments/staging
-terraform init
-
-# Import CloudWatch log group if it still exists
-terraform import module.vpc.aws_cloudwatch_log_group.vpc_flow /aws/vpc/insight-edge-staging/flow-logs
-
-# Import Secrets Manager secret
-terraform import module.rds.aws_secretsmanager_secret.db insight-edge/staging/db-credentials
-```
-
-> If either import returns `Cannot import non-existent remote object`, skip it.
-
-### Step 2b — Apply
-
-```powershell
-terraform apply
-```
-
-### Step 2c — Add ACM Validation CNAME to Cloudflare (during apply)
-
-Use the same command from Step 1c. Find the block for `stage.insight-edgecs.com` and add to Cloudflare:
-
-| Field | Value |
-|-------|-------|
-| Type | `CNAME` |
-| Name | Everything before `.insight-edgecs.com.` in the `Name` field (e.g. `_abc123.stage`) |
-| Target | The `Value` field — remove the trailing dot |
-| Proxy status | **DNS only (grey cloud)** |
-| TTL | Auto |
-
-### Step 2d — Add subdomain CNAME after apply completes
-
-| Field | Value |
-|-------|-------|
-| Type | `CNAME` |
-| Name | `stage` |
-| Target | `alb_dns_name` output value |
-| Proxy status | **DNS only (grey cloud)** |
-| TTL | Auto |
-
-### Step 2e — Verify staging
-
-```powershell
 nslookup stage.insight-edgecs.com
 ```
 
-Then open `https://stage.insight-edgecs.com` — expect **"Welcome to Staging Environment"** with a padlock.
+Both should return IP addresses. Then open:
+- `https://dev.insight-edgecs.com` — expect **"Welcome to Development Environment"** with a padlock
+- `https://stage.insight-edgecs.com` — expect **"Welcome to Staging Environment"** with a padlock
 
 ---
 
-## Step 3 — Deploy Prod
+## Step 2 — Deploy Prod
 
-### Step 3a — Pre-apply imports
+### Step 2a — Pre-apply imports
 
 ```powershell
 cd environments/prod
@@ -184,13 +136,13 @@ terraform import module.rds.aws_secretsmanager_secret.db insight-edge/prod/db-cr
 
 > If either import returns `Cannot import non-existent remote object`, skip it.
 
-### Step 3b — Apply
+### Step 2b — Apply
 
 ```powershell
 terraform apply
 ```
 
-### Step 3c — Add ACM Validation CNAME to Cloudflare (during apply)
+### Step 2c — Add ACM Validation CNAME to Cloudflare (during apply)
 
 Use the same command from Step 1c. Find the block for `prod.insight-edgecs.com` and add to Cloudflare:
 
@@ -202,7 +154,7 @@ Use the same command from Step 1c. Find the block for `prod.insight-edgecs.com` 
 | Proxy status | **DNS only (grey cloud)** |
 | TTL | Auto |
 
-### Step 3d — Add subdomain CNAME after apply completes
+### Step 2d — Add subdomain CNAME after apply completes
 
 | Field | Value |
 |-------|-------|
@@ -212,7 +164,7 @@ Use the same command from Step 1c. Find the block for `prod.insight-edgecs.com` 
 | Proxy status | **DNS only (grey cloud)** |
 | TTL | Auto |
 
-### Step 3e — Verify prod
+### Step 2e — Verify prod
 
 ```powershell
 nslookup prod.insight-edgecs.com
@@ -222,102 +174,31 @@ Then open `https://prod.insight-edgecs.com` — expect **"Welcome to Production 
 
 ---
 
----
+## Step 3 — Cloudflare DNS Summary
 
-## Option: Deploy Nonprod Instead of Separate Dev + Staging
-
-The `environments/nonprod` environment runs dev and staging on shared infrastructure (one VPC, one NAT Gateway, one ALB, one RDS). Use this instead of Steps 1 and 2 to save ~$2.76 per 24 hours.
-
-> **Do not** run `environments/dev` or `environments/staging` at the same time as `environments/nonprod` — they share resource names in the same AWS account.
-
-### Nonprod Step A — Pre-apply imports
-
-```powershell
-cd environments/nonprod
-terraform init
-
-# Import CloudWatch log group if it persisted from a previous run
-terraform import module.vpc.aws_cloudwatch_log_group.vpc_flow /aws/vpc/insight-edge-nonprod/flow-logs
-
-# Import Secrets Manager secret (after restoring it above)
-terraform import module.rds.aws_secretsmanager_secret.db insight-edge/nonprod/db-credentials
-```
-
-> If either returns `Cannot import non-existent remote object`, skip it.
-
-### Nonprod Step B — Apply
-
-```powershell
-terraform apply
-```
-
-### Nonprod Step C — Add ACM Validation CNAMEs to Cloudflare (during apply)
-
-The nonprod cert covers **both** `dev.insight-edgecs.com` and `stage.insight-edgecs.com`. When you see `aws_acm_certificate_validation.main: Still creating...`, run:
-
-```powershell
-$arns = (aws acm list-certificates --region us-east-1 --query "CertificateSummaryList[*].CertificateArn" --output text) -split '\s+'
-foreach ($arn in $arns) {
-  aws acm describe-certificate --certificate-arn $arn --region us-east-1 `
-    --query "[Certificate.DomainName, Certificate.DomainValidationOptions[*].ResourceRecord]" `
-    --output json
-}
-```
-
-Find the block for `dev.insight-edgecs.com` (which also covers `stage`). Add **two** CNAME records to Cloudflare:
-
-| Type | Name | Target | Proxy |
-|------|------|--------|-------|
-| CNAME | `_<hash>.dev` | validation value (no trailing dot) | DNS only |
-| CNAME | `_<hash>.stage` | validation value (no trailing dot) | DNS only |
-
-### Nonprod Step D — Add both subdomain CNAMEs after apply
-
-Both subdomains point to the **same** ALB (use the `alb_dns_name` output):
-
-| Type | Name | Target | Proxy |
-|------|------|--------|-------|
-| CNAME | `dev` | `alb_dns_name` output value | DNS only |
-| CNAME | `stage` | `alb_dns_name` output value | DNS only |
-
-### Nonprod Step E — Verify
-
-```powershell
-nslookup dev.insight-edgecs.com
-nslookup stage.insight-edgecs.com
-```
-
-Both should resolve. Then open `https://dev.insight-edgecs.com` and `https://stage.insight-edgecs.com`.
-
----
-
-## Step 4 — Cloudflare DNS Summary
-
-**If using separate dev + staging (Steps 1–3):** you should have **6 CNAME records** in Cloudflare (all grey cloud, DNS only):
-
-**If using nonprod instead (Option above + Step 3):** you should have **5 CNAME records** — 2 ACM validation (dev+stage from same cert), 2 subdomain CNAMEs (dev+stage → same ALB), 1 prod ACM, 1 prod subdomain.
+By the end you should have **5 CNAME records** in Cloudflare (all grey cloud, DNS only):
 
 | Type | Name | Purpose |
 |------|------|---------|
-| CNAME | `_<hash>.dev` | ACM cert validation for dev |
-| CNAME | `_<hash>.stage` | ACM cert validation for staging |
+| CNAME | `_<hash>.dev` | ACM cert validation for dev (nonprod cert) |
+| CNAME | `_<hash>.stage` | ACM cert validation for staging (nonprod cert) |
 | CNAME | `_<hash>.prod` | ACM cert validation for prod |
-| CNAME | `dev` | Routes traffic to dev ALB |
-| CNAME | `stage` | Routes traffic to staging ALB |
+| CNAME | `dev` | Routes traffic to nonprod ALB |
+| CNAME | `stage` | Routes traffic to nonprod ALB (same target as dev) |
 | CNAME | `prod` | Routes traffic to prod ALB |
 
-> All 6 records must be grey cloud. Orange cloud breaks ACM certificates and causes SSL errors.
-> The `_<hash>` prefix is different on every new deployment — always delete old ACM validation records and add fresh ones.
+> All records must be grey cloud. Orange cloud breaks ACM certificates and causes SSL errors.
+> The `_<hash>` prefix changes on every new deployment — always delete old ACM validation records and add fresh ones.
 
 ---
 
-## Step 5 — Confirm SNS Email Subscriptions
+## Step 4 — Confirm SNS Email Subscriptions
 
 After each environment apply, AWS sends a **"Subscription Confirmation"** email to `gabelorm@insight-edgecs.com`. Check inbox and spam — click the confirm link. Without this you receive no alerts.
 
 ---
 
-## Step 6 — Final Verification
+## Step 5 — Final Verification
 
 ```powershell
 nslookup dev.insight-edgecs.com
@@ -341,10 +222,12 @@ All three should show a padlock (HTTPS working via ACM).
 
 | Problem | Fix |
 |---------|-----|
-| Apply stuck at ACM validation 30+ min | ACM CNAME not added to Cloudflare — use Step 1c command to get values |
+| Apply stuck at ACM validation 30+ min | ACM CNAME not added to Cloudflare — use Step 1c command to get values. Nonprod needs **two** CNAMEs (dev + stage). |
 | `ResourceAlreadyExistsException` on log group | Pre-apply import was skipped — run `terraform import module.vpc.aws_cloudwatch_log_group.vpc_flow /aws/vpc/insight-edge-<env>/flow-logs` then `terraform apply` |
 | `You can't create this secret because it is scheduled for deletion` | Pre-apply restore was skipped — run `aws secretsmanager restore-secret --secret-id insight-edge/<env>/db-credentials --region us-east-1` then the import command, then `terraform apply` |
 | `nslookup` returns no records | Cloudflare CNAME not saved — delete and re-add, click the green checkmark to confirm before leaving the page |
-| `nslookup` resolves but browser shows "can't be reached" | Browser cache — try incognito window. If it works, go to `chrome://net-internals/#dns` → Clear host cache |
+| `nslookup` resolves but browser shows "can't be reached" | Browser cache — try incognito. If it works, go to `chrome://net-internals/#dns` → Clear host cache |
 | Site loads but no HTTPS padlock / SSL error | ACM validation CNAME missing or orange cloud is on — check Cloudflare records |
 | 502 Bad Gateway | EC2 instances not yet healthy — wait 5–10 minutes, check EC2 → Target Groups |
+| Prod terraform destroy — ALB deletion protection | Run: `aws elbv2 modify-load-balancer-attributes --load-balancer-arn <arn> --attributes Key=deletion_protection.enabled,Value=false --region us-east-1` |
+| Prod terraform destroy — RDS not in available state | Check: `aws rds describe-db-instances --db-instance-identifier insight-edge-prod-primary --query "DBInstances[0].DBInstanceStatus" --region us-east-1 --output text` — wait for `available` then re-run destroy |

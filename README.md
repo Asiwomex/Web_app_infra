@@ -1,5 +1,7 @@
 # Gabriel Infra — AWS Infrastructure with Terraform
 
+![Web App Infrastructure Diagram](web_app_infra.png)
+
 This project builds a complete, production-ready web application infrastructure on AWS using Terraform. It creates three isolated environments — **dev**, **staging**, and **prod** — each with its own network, servers, database, firewall, VPN, authentication, and monitoring.
 
 ---

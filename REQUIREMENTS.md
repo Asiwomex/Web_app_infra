@@ -194,7 +194,7 @@ If you received this project as a zip file, unzip it to a local folder. If it is
 
 ```bash
 git clone <repository-url>
-cd Gabriel_Infra
+cd Web_app_infra
 ```
 
 ---
@@ -330,7 +330,7 @@ Similarly, for GuardDuty alerts (which fire for HIGH/CRITICAL security threats),
 Before touching any files, here is what each folder does:
 
 ```
-Gabriel_Infra/
+Web_app_infra/
 ├── bootstrap/              Run ONCE per AWS account. Creates the S3 bucket that
 │                           stores Terraform's memory, plus account-wide security.
 │

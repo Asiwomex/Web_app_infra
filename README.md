@@ -1,4 +1,4 @@
-# Gabriel Infra — AWS Infrastructure with Terraform
+# Web_app_infra — AWS Infrastructure with Terraform
 
 ![Web App Infrastructure Diagram](web_app_infra.png)
 

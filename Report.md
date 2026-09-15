@@ -1,6 +1,6 @@
-# Gabriel_Infra — Deployment Report
+# Web_app_infra — Deployment Report
 
-**Project:** Gabriel_Infra  
+**Project:** Web_app_infra  
 **Domain:** theboateng.me (Namecheap)  
 **Cloud:** AWS — us-east-1  
 **AWS Account ID:** 310688446551  

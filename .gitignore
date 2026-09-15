@@ -33,8 +33,12 @@ terraform.rc
 *.pem
 *.key
 
-# ── Claude Code session data ──────────────────────────────────────────────────
+# ── Local editor/tooling session data ──────────────────────────────────────────
 .claude/
+
+# ── Local notes with live account identifiers — never commit ───────────────────
+aws_infra_acm_validation_and_records.txt
+summary_of_all_records.txt
 
 # ── Editor / IDE ──────────────────────────────────────────────────────────────
 .vscode/

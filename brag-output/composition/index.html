@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Web_app_infra — brag</title>
+    <script src="assets/vendor/gsap.min.js"></script>
+    <script src="assets/audio-bass.js"></script>
+    <style>
+      :root {
+        --bg: #0b1220;
+        --panel: #121b2e;
+        --panel-2: #172238;
+        --line: #26324a;
+        --fg: #e8edf5;
+        --dim: #9aa7bd;
+        --accent: #ff9900;
+        --flow: #e8636b;
+        --ok: #3fb950;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "JetBrains Mono", monospace;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+      }
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+      .wrap {
+        position: absolute;
+        inset: 0;
+      }
+      .display {
+        font-family: "Montserrat", sans-serif;
+        font-weight: 900;
+        letter-spacing: -0.035em;
+      }
+
+      /* ---------- persistent background ---------- */
+      #bg-grid {
+        position: absolute;
+        left: -120px;
+        top: -120px;
+        width: 2160px;
+        height: 1320px;
+        background-image: linear-gradient(rgba(154, 167, 189, 0.13) 2px, transparent 2px),
+          linear-gradient(90deg, rgba(154, 167, 189, 0.13) 2px, transparent 2px);
+        background-size: 120px 120px;
+      }
+      #bg-vignette {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at 50% 50%, rgba(11, 18, 32, 0) 30%, rgba(11, 18, 32, 0.92) 85%);
+      }
+      #bg-glow {
+        position: absolute;
+        left: 1060px;
+        top: 80px;
+        width: 1100px;
+        height: 1100px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 153, 0, 0.26) 0%, rgba(255, 153, 0, 0) 65%);
+      }
+      .meta {
+        position: absolute;
+        font-size: 22px;
+        color: var(--dim);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .meta b {
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      /* ---------- scene 1: terminal ---------- */
+      #s1-ghost {
+        position: absolute;
+        left: 90px;
+        bottom: 30px;
+        font-size: 300px;
+        color: rgba(154, 167, 189, 0.1);
+        white-space: nowrap;
+      }
+      #term {
+        position: absolute;
+        left: 210px;
+        top: 250px;
+        width: 1500px;
+        height: 560px;
+        background: var(--panel);
+        border: 3px solid var(--line);
+        border-radius: 22px;
+        box-shadow: 0 40px 120px rgba(0, 0, 0, 0.55);
+        overflow: hidden;
+      }
+      #term-bar {
+        height: 74px;
+        background: var(--panel-2);
+        border-bottom: 3px solid var(--line);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 32px;
+      }
+      .dot {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+      }
+      #term-path {
+        margin-left: 24px;
+        font-size: 24px;
+        color: var(--dim);
+      }
+      #term-body {
+        padding: 70px 70px;
+        font-size: 64px;
+        line-height: 1.5;
+      }
+      .prompt {
+        color: var(--accent);
+        font-weight: 700;
+      }
+      #cmdline {
+        position: relative;
+      }
+      #cmd .ch {
+        opacity: 0;
+      }
+      #caret {
+        position: absolute;
+        top: 12px;
+        left: 0;
+        width: 34px;
+        height: 70px;
+        background: var(--fg);
+        vertical-align: -12px;
+        margin-left: 6px;
+      }
+      #done {
+        font-weight: 700;
+        color: var(--ok);
+        opacity: 0;
+      }
+      #done-sub {
+        font-size: 36px;
+        color: var(--dim);
+        opacity: 0;
+      }
+
+      /* ---------- scene 2: environments ---------- */
+      #s2-head {
+        position: absolute;
+        left: 120px;
+        top: 120px;
+        font-size: 104px;
+        line-height: 1;
+        margin: 0;
+      }
+      #s2-head span {
+        color: var(--accent);
+      }
+      #cards {
+        position: absolute;
+        left: 120px;
+        top: 330px;
+        width: 1680px;
+        display: flex;
+        gap: 50px;
+      }
+      .card {
+        flex: 1;
+        height: 560px;
+        box-sizing: border-box;
+        background: var(--panel);
+        border: 3px solid var(--line);
+        border-radius: 24px;
+        padding: 48px 50px;
+        position: relative;
+      }
+      .card.prod {
+        border-color: var(--accent);
+      }
+      .card h3 {
+        margin: 0 0 34px 0;
+        font-size: 88px;
+        line-height: 1;
+      }
+      .card.prod h3 {
+        color: var(--accent);
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 34px;
+        padding: 20px 0;
+        border-top: 2px solid var(--line);
+      }
+      .row .k {
+        color: var(--dim);
+      }
+      .row .v {
+        font-weight: 700;
+      }
+      .tag {
+        position: absolute;
+        left: 50px;
+        bottom: 44px;
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--bg);
+        background: var(--accent);
+        border-radius: 10px;
+        padding: 10px 18px;
+        letter-spacing: 0.04em;
+      }
+      .tag.muted {
+        color: var(--dim);
+        background: transparent;
+        border: 2px solid var(--line);
+      }
+
+      /* ---------- scene 3: request path ---------- */
+      #s3-label {
+        left: 120px;
+        top: 130px;
+      }
+      #path {
+        position: absolute;
+        left: 120px;
+        top: 200px;
+        width: 700px;
+        height: 760px;
+      }
+      #path-rail,
+      #path-fill {
+        position: absolute;
+        left: 22px;
+        top: 40px;
+        width: 6px;
+        height: 620px;
+        border-radius: 3px;
+      }
+      #path-rail {
+        background: var(--line);
+      }
+      #path-fill {
+        background: var(--flow);
+        transform-origin: 50% 0%;
+      }
+      .node {
+        position: absolute;
+        left: 0;
+        width: 700px;
+        height: 130px;
+      }
+      .node .pin {
+        position: absolute;
+        left: 5px;
+        top: 22px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--bg);
+        border: 5px solid var(--line);
+        box-sizing: border-box;
+      }
+      .node .pin i {
+        position: absolute;
+        inset: 6px;
+        border-radius: 50%;
+        background: var(--flow);
+        opacity: 0;
+      }
+      .node .name {
+        position: absolute;
+        left: 80px;
+        top: 6px;
+        font-size: 50px;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+      .node .desc {
+        position: absolute;
+        left: 80px;
+        top: 74px;
+        font-size: 25px;
+        color: var(--dim);
+        white-space: nowrap;
+      }
+      #diagram {
+        position: absolute;
+        left: 850px;
+        top: 300px;
+        width: 960px;
+        height: 468px;
+        border-radius: 22px;
+        overflow: hidden;
+        border: 4px solid var(--accent);
+        background: #ffffff;
+      }
+      #diagram img {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 960px;
+        height: 468px;
+        transform-origin: 32% 55%;
+      }
+      #diagram-cap {
+        position: absolute;
+        left: 850px;
+        top: 800px;
+        font-size: 24px;
+        color: var(--dim);
+      }
+
+      /* ---------- scene 4: no ssh ---------- */
+      #nos {
+        position: absolute;
+        left: 120px;
+        top: 150px;
+      }
+      .no {
+        font-size: 150px;
+        line-height: 1.12;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 44px;
+      }
+      .no .bar {
+        width: 26px;
+        height: 118px;
+        border-radius: 6px;
+        background: var(--accent);
+      }
+      #ssm {
+        position: absolute;
+        left: 120px;
+        top: 780px;
+        width: 1680px;
+        box-sizing: border-box;
+        background: var(--panel);
+        border: 3px solid var(--line);
+        border-radius: 18px;
+        padding: 30px 40px;
+        font-size: 36px;
+      }
+      #ssm .c {
+        color: var(--dim);
+      }
+      #ssm-note {
+        position: absolute;
+        right: 120px;
+        top: 700px;
+        font-size: 26px;
+        color: var(--dim);
+      }
+
+      /* ---------- scene 5: outro ---------- */
+      #o-glow {
+        position: absolute;
+        left: 460px;
+        top: 40px;
+        width: 1000px;
+        height: 1000px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 153, 0, 0.3) 0%, rgba(255, 153, 0, 0) 62%);
+      }
+      #o-title {
+        position: absolute;
+        left: 0;
+        width: 1920px;
+        top: 250px;
+        text-align: center;
+        font-size: 190px;
+        line-height: 1;
+        margin: 0;
+      }
+      #o-title span {
+        color: var(--accent);
+      }
+      #o-sub {
+        position: absolute;
+        left: 0;
+        width: 1920px;
+        top: 490px;
+        text-align: center;
+        font-size: 46px;
+        color: var(--fg);
+      }
+      #stats {
+        position: absolute;
+        left: 260px;
+        width: 1400px;
+        top: 650px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .stat {
+        width: 420px;
+        text-align: center;
+        border-top: 4px solid var(--line);
+        padding-top: 26px;
+      }
+      .stat .n {
+        font-size: 120px;
+        line-height: 1;
+        color: var(--accent);
+      }
+      .stat .l {
+        margin-top: 14px;
+        font-size: 30px;
+        color: var(--dim);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="21.5">
+      <!-- persistent background -->
+      <section id="bg" class="clip" data-start="0" data-duration="21.5" data-track-index="0">
+        <div id="bg-grid"></div>
+        <div id="bg-glow"></div>
+        <div id="bg-vignette"></div>
+      </section>
+
+      <!-- Scene 1: hook -->
+      <section id="s1" class="clip" data-start="0" data-duration="3.27" data-track-index="1">
+        <div class="wrap" id="s1-wrap">
+          <div id="s1-ghost" class="display" aria-hidden="true" data-layout-allow-occlusion>terraform</div>
+          <div class="meta" style="left: 120px; top: 110px"><b>Web_app_infra</b> · AWS · Terraform</div>
+          <div id="term">
+            <div id="term-bar">
+              <div class="dot" style="background: #e8636b"></div>
+              <div class="dot" style="background: #ff9900"></div>
+              <div class="dot" style="background: #3fb950"></div>
+              <div id="term-path">~/Web_app_infra/environments/prod</div>
+            </div>
+            <div id="term-body">
+              <div><span class="prompt">$&nbsp;</span><span id="cmdline"><span id="cmd"><span class="ch">t</span><span class="ch">e</span><span class="ch">r</span><span class="ch">r</span><span class="ch">a</span><span class="ch">f</span><span class="ch">o</span><span class="ch">r</span><span class="ch">m</span><span class="ch">&nbsp;</span><span class="ch">a</span><span class="ch">p</span><span class="ch">p</span><span class="ch">l</span><span class="ch">y</span></span><span id="caret"></span></span></div>
+              <div id="done">Apply complete!</div>
+              <div id="done-sub">dev · staging · prod — all green</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Scene 2: environments -->
+      <section id="s2" class="clip" data-start="3.27" data-duration="5.47" data-track-index="1">
+        <div class="wrap" id="s2-wrap">
+          <h1 id="s2-head" class="display">Three isolated environments<span>.</span></h1>
+          <div id="cards">
+            <div class="card" id="c-dev">
+              <h3 class="display">dev</h3>
+              <div class="row"><span class="k">VPC</span><span class="v">10.0.0.0/22</span></div>
+              <div class="row"><span class="k">EC2</span><span class="v">t3.small</span></div>
+              <div class="row"><span class="k">ASG</span><span class="v">1 – 2 servers</span></div>
+              <div class="tag muted">1 NAT gateway</div>
+            </div>
+            <div class="card" id="c-stg">
+              <h3 class="display">staging</h3>
+              <div class="row"><span class="k">VPC</span><span class="v">10.0.4.0/22</span></div>
+              <div class="row"><span class="k">EC2</span><span class="v">t3.medium</span></div>
+              <div class="row"><span class="k">ASG</span><span class="v">2 – 4 servers</span></div>
+              <div class="tag muted">1 NAT gateway</div>
+            </div>
+            <div class="card prod" id="c-prod">
+              <h3 class="display">prod</h3>
+              <div class="row"><span class="k">VPC</span><span class="v">10.0.8.0/22</span></div>
+              <div class="row"><span class="k">EC2</span><span class="v">t3.large</span></div>
+              <div class="row"><span class="k">ASG</span><span class="v">2 – 6 servers</span></div>
+              <div class="tag">HA NAT · deletion protection</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Scene 3: request path -->
+      <section id="s3" class="clip" data-start="8.74" data-duration="4.37" data-track-index="1">
+        <div class="wrap" id="s3-wrap">
+          <div class="meta" id="s3-label"><b>Every request</b> takes this path</div>
+          <div id="path">
+            <div id="path-rail"></div>
+            <div id="path-fill"></div>
+            <div class="node" id="n1" style="top: 20px">
+              <div class="pin"><i></i></div>
+              <div class="name display">Route 53</div>
+              <div class="desc">DNS → load balancer</div>
+            </div>
+            <div class="node" id="n2" style="top: 175px">
+              <div class="pin"><i></i></div>
+              <div class="name display">WAF</div>
+              <div class="desc">OWASP · SQLi · Log4Shell · rate limit</div>
+            </div>
+            <div class="node" id="n3" style="top: 330px">
+              <div class="pin"><i></i></div>
+              <div class="name display">ALB</div>
+              <div class="desc">HTTPS only · TLS 1.3 · 2 AZs</div>
+            </div>
+            <div class="node" id="n4" style="top: 485px">
+              <div class="pin"><i></i></div>
+              <div class="name display">EC2 Auto Scaling</div>
+              <div class="desc">scales out at 70% CPU</div>
+            </div>
+            <div class="node" id="n5" style="top: 640px">
+              <div class="pin"><i></i></div>
+              <div class="name display">RDS PostgreSQL</div>
+              <div class="desc">primary + read replica, encrypted</div>
+            </div>
+          </div>
+          <div id="diagram"><img data-layout-allow-overflow id="diagram-img" src="assets/img/architecture.jpg" alt="Web_app AWS architecture diagram" /></div>
+          <div id="diagram-cap">web_app_infra.png — the architecture Terraform builds</div>
+        </div>
+      </section>
+
+      <!-- Scene 4: no ssh -->
+      <section id="s4" class="clip" data-start="13.11" data-duration="4.36" data-track-index="1">
+        <div class="wrap" id="s4-wrap">
+          <div id="nos">
+            <div class="no display" id="no1"><div class="bar"></div>No SSH.</div>
+            <div class="no display" id="no2"><div class="bar"></div>No open ports.</div>
+            <div class="no display" id="no3"><div class="bar"></div>No key pairs.</div>
+          </div>
+          <div id="ssm-note">Admin access: SSM Session Manager only</div>
+          <div id="ssm"><span class="prompt">$ </span>aws ssm start-session --target <span class="c">i-0a1b2c3d…</span></div>
+        </div>
+      </section>
+
+      <!-- Scene 5: outro -->
+      <section id="s5" class="clip" data-start="17.47" data-duration="4.03" data-track-index="1">
+        <div class="wrap" id="s5-wrap">
+          <div id="o-glow"></div>
+          <h1 id="o-title" class="display">Web<span>_</span>app<span>_</span>infra</h1>
+          <div id="o-sub">Production-grade AWS, written in Terraform.</div>
+          <div id="stats">
+            <div class="stat" id="st1"><div class="n display">11</div><div class="l">Terraform modules</div></div>
+            <div class="stat" id="st2"><div class="n display">3</div><div class="l">environments</div></div>
+            <div class="stat" id="st3"><div class="n display">0</div><div class="l">open admin ports</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- audio -->
+      <audio id="bg-music" data-start="0" data-duration="21.5" data-track-index="10" data-volume="0.32" src="assets/music/bed.mp3"></audio>
+      <audio id="sfx-key-0" data-start="0.340" data-duration="0.25" data-track-index="11" data-volume="0.55" src="assets/sfx/keyboard/keypress-003.wav"></audio>
+      <audio id="sfx-key-1" data-start="0.406" data-duration="0.25" data-track-index="12" data-volume="0.55" src="assets/sfx/keyboard/keypress-007.wav"></audio>
+      <audio id="sfx-key-2" data-start="0.472" data-duration="0.25" data-track-index="13" data-volume="0.55" src="assets/sfx/keyboard/keypress-011.wav"></audio>
+      <audio id="sfx-key-3" data-start="0.538" data-duration="0.25" data-track-index="14" data-volume="0.55" src="assets/sfx/keyboard/keypress-014.wav"></audio>
+      <audio id="sfx-key-4" data-start="0.604" data-duration="0.25" data-track-index="15" data-volume="0.55" src="assets/sfx/keyboard/keypress-018.wav"></audio>
+      <audio id="sfx-key-5" data-start="0.670" data-duration="0.25" data-track-index="11" data-volume="0.55" src="assets/sfx/keyboard/keypress-021.wav"></audio>
+      <audio id="sfx-key-6" data-start="0.736" data-duration="0.25" data-track-index="12" data-volume="0.55" src="assets/sfx/keyboard/keypress-025.wav"></audio>
+      <audio id="sfx-key-7" data-start="0.802" data-duration="0.25" data-track-index="13" data-volume="0.55" src="assets/sfx/keyboard/keypress-029.wav"></audio>
+      <audio id="sfx-key-8" data-start="0.868" data-duration="0.25" data-track-index="14" data-volume="0.55" src="assets/sfx/keyboard/keypress-003.wav"></audio>
+      <audio id="sfx-key-10" data-start="1.000" data-duration="0.25" data-track-index="11" data-volume="0.55" src="assets/sfx/keyboard/keypress-011.wav"></audio>
+      <audio id="sfx-key-11" data-start="1.066" data-duration="0.25" data-track-index="12" data-volume="0.55" src="assets/sfx/keyboard/keypress-014.wav"></audio>
+      <audio id="sfx-key-12" data-start="1.132" data-duration="0.25" data-track-index="13" data-volume="0.55" src="assets/sfx/keyboard/keypress-018.wav"></audio>
+      <audio id="sfx-key-13" data-start="1.198" data-duration="0.25" data-track-index="14" data-volume="0.55" src="assets/sfx/keyboard/keypress-021.wav"></audio>
+      <audio id="sfx-key-14" data-start="1.264" data-duration="0.25" data-track-index="15" data-volume="0.55" src="assets/sfx/keyboard/keypress-025.wav"></audio>
+      <audio id="sfx-enter" data-start="1.500" data-duration="0.25" data-track-index="16" data-volume="0.8" src="assets/sfx/keyboard/keypress-029.wav"></audio>
+      <audio id="sfx-done" data-start="1.600" data-duration="0.11" data-track-index="17" data-volume="0.55" src="assets/sfx/interface/drop_001.ogg"></audio>
+      <audio id="sfx-card-0" data-start="3.800" data-duration="0.19" data-track-index="17" data-volume="0.6" src="assets/sfx/interface/drop_002.ogg"></audio>
+      <audio id="sfx-card-1" data-start="4.890" data-duration="0.19" data-track-index="17" data-volume="0.6" src="assets/sfx/interface/drop_002.ogg"></audio>
+      <audio id="sfx-card-2" data-start="5.980" data-duration="0.19" data-track-index="17" data-volume="0.6" src="assets/sfx/interface/drop_002.ogg"></audio>
+      <audio id="sfx-s3" data-start="8.720" data-duration="0.183" data-track-index="18" data-volume="0.6" src="assets/sfx/impact/impactSoft_medium_001.ogg"></audio>
+      <audio id="sfx-no-0" data-start="13.130" data-duration="0.183" data-track-index="18" data-volume="0.65" src="assets/sfx/impact/impactSoft_medium_001.ogg"></audio>
+      <audio id="sfx-no-1" data-start="13.660" data-duration="0.135" data-track-index="18" data-volume="0.65" src="assets/sfx/impact/impactSoft_medium_002.ogg"></audio>
+      <audio id="sfx-no-2" data-start="14.200" data-duration="0.147" data-track-index="18" data-volume="0.65" src="assets/sfx/impact/impactSoft_medium_004.ogg"></audio>
+      <audio id="sfx-bell" data-start="17.450" data-duration="1.5" data-track-index="19" data-volume="0.5" src="assets/sfx/impact/impactBell_heavy_000.ogg"></audio>
+    </div>
+
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      const CH_START = 0.35, CH_STEP = 0.066;
+
+      // ---- background ambience (finite) ----
+      tl.fromTo("#bg-grid", { x: 0, y: 0 }, { x: -60, y: -120, duration: 21.5, ease: "none" }, 0);
+
+      // ---- Scene 1: hook ----
+      tl.fromTo("#term", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: "power3.out" }, 0);
+      tl.fromTo("#s1-ghost", { x: 60 }, { x: -60, duration: 3.27, ease: "none" }, 0);
+      const CH_W = 38.4; // JetBrains Mono advance (0.6em @ 64px), precomputed
+      tl.set("#caret", { x: 0 }, 0);
+      document.querySelectorAll("#cmd .ch").forEach((el, i) => {
+        tl.set(el, { opacity: 1 }, CH_START + i * CH_STEP);
+        tl.set("#caret", { x: (i + 1) * CH_W + 6 }, CH_START + i * CH_STEP);
+      });
+      tl.set("#caret", { opacity: 0 }, 1.55);
+      tl.set("#done", { opacity: 1 }, 1.62);
+      tl.fromTo("#done", { x: -20 }, { x: 0, duration: 0.25, ease: "power2.out" }, 1.62);
+      tl.fromTo("#done-sub", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }, 1.85);
+      tl.to("#s1-wrap", { opacity: 0, duration: 0.25, ease: "power1.in" }, 3.02);
+
+      // ---- Scene 2: environments (starts 3.27) ----
+      tl.fromTo("#s2-head", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "power3.out" }, 3.3);
+      // beat-grid (every other beat): dev 3.82, staging 4.91, prod 6.00
+      [["#c-dev", 3.82], ["#c-stg", 4.91], ["#c-prod", 6.0]].forEach(([sel, t]) => {
+        tl.fromTo(sel, { y: 90, opacity: 0, rotation: 2 }, { y: 0, opacity: 1, rotation: 0, duration: 0.5, ease: "back.out(1.4)" }, t);
+      });
+      tl.to("#s2-wrap", { opacity: 0, x: -80, duration: 0.3, ease: "power2.in" }, 8.44);
+
+      // ---- Scene 3: request path (beat-locked: 8.74s) ----
+      tl.fromTo("#s3-label", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 8.78);
+      tl.fromTo(".node", { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: 0.4, ease: "power3.out", stagger: 0.12 }, 8.8);
+      tl.fromTo("#diagram", { x: 80, opacity: 0 }, { x: 0, opacity: 1, duration: 0.55, ease: "power3.out" }, 8.85);
+      tl.fromTo("#diagram-cap", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 9.3);
+      tl.fromTo("#diagram-img", { scale: 1.02 }, { scale: 1.12, duration: 4.2, ease: "sine.inOut" }, 8.85);
+      tl.fromTo("#path-fill", { scaleY: 0 }, { scaleY: 1, duration: 2.2, ease: "none" }, 9.29);
+      // beat-grid: pins light at 9.29 / 9.83 / 10.37 / 10.93 / 11.46
+      [9.29, 9.83, 10.37, 10.93, 11.46].forEach((t, i) => {
+        const pin = `#n${i + 1} .pin i`;
+        tl.fromTo(pin, { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.25, ease: "back.out(2)" }, t);
+        tl.to(`#n${i + 1} .pin`, { borderColor: "#e8636b", duration: 0.2 }, t);
+      });
+      tl.to("#s3-wrap", { opacity: 0, duration: 0.25, ease: "power1.in" }, 12.86);
+
+      // ---- Scene 4: no ssh (beat-locked: 13.11s) ----
+      [["#no1", 13.15], ["#no2", 13.68], ["#no3", 14.22]].forEach(([sel, t]) => {
+        tl.fromTo(sel, { x: -120, opacity: 0 }, { x: 0, opacity: 1, duration: 0.4, ease: "expo.out" }, t);
+      });
+      tl.fromTo("#ssm", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "power3.out" }, 14.9);
+      tl.fromTo("#ssm-note", { opacity: 0 }, { opacity: 1, duration: 0.35 }, 15.1);
+      tl.to("#s4-wrap", { opacity: 0, duration: 0.3, ease: "power1.in" }, 17.17);
+
+      // ---- Scene 5: outro (beat-locked: 17.47s) ----
+      tl.fromTo("#o-title", { scale: 0.9, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "expo.out" }, 17.47);
+      tl.fromTo("#o-sub", { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "power3.out" }, 17.95);
+      // beat-locked: stats land on 18.56 strong cue
+      tl.fromTo(".stat", { y: 50, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "back.out(1.5)", stagger: 0.18 }, 18.56);
+
+      // ---- audio-reactive: bass drives the ambient glows (subtle) ----
+      const BASS = window.AUDIO_BASS || [];
+      const FRAMES = Math.min(BASS.length, 645);
+      for (let f = 0; f < FRAMES; f++) {
+        tl.call(
+          (function (b, t) {
+            return function () {
+              gsap.set("#bg-glow", { opacity: 0.55 + 0.45 * b, scale: 0.94 + 0.1 * b });
+              if (t >= 17.47) gsap.set("#o-glow", { opacity: 0.6 + 0.4 * b, scale: 0.95 + 0.08 * b });
+              if (t >= 8.74 && t < 13.11) gsap.set("#diagram", { boxShadow: `0 0 ${20 + 60 * b}px rgba(255,153,0,${0.25 + 0.35 * b})` });
+            };
+          })(BASS[f], f / 30),
+          [],
+          f / 30
+        );
+      }
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

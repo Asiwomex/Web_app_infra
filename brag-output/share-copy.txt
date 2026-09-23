@@ -1,0 +1,1 @@
+Introducing Web_app_infra: one terraform apply, three isolated AWS environments. WAF, auto-scaling EC2, RDS with a read replica, CloudWatch alarms, and zero open admin ports (SSM only). Built with Terraform, 11 modules.
